@@ -1,6 +1,8 @@
 import { BigQuery, BigQueryTimestamp, Table } from '@google-cloud/bigquery'
+import bytes from 'bytes'
 import { createHash } from 'crypto'
 import { MongoClient } from 'mongodb'
+import sizeof from 'object-sizeof'
 import { BigQueryHelper } from '../helpers/bigquery.helper'
 import { MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
@@ -9,34 +11,34 @@ import { Regex, TransactionalContext, Worker } from '../regex'
 import { Export, ExportService } from '../services/export.service'
 import { Source, SourceService } from '../services/source.service'
 import { Target, TargetService } from '../services/target.service'
-import sizeof from 'object-sizeof'
-import bytes from 'bytes'
 
 type ExportWorkerSource = { client: MongoClient, database: string, collection: string, filter: any }
 type ExportWorkerTarget = { client: BigQuery, dataset: string, table: { main: Table, temporary: Table } }
-type ExportWorkerStatisticsInput = { total: number, remaining: number, ingested: { size: number }, data: any[] }
+type ExportWorkerInsertInput = { table: Table, rows: any[] }
 
 export class ExportWorker extends Worker {
 
+    private statistics?: ExportWorkerStatistics = undefined
+
     public constructor(
         private readonly _context: TransactionalContext,
-        private readonly _data: Export
+        private readonly _input: Export
     ) { super() }
 
     public get name(): string {
         const name = ExportWorker.name
-        const from = `${this.data.source.name}.${this.data.source.database}.${this.data.source.collection}`
-        const to = this.data.target.name
+        const from = `${this.input.source.name}.${this.input.source.database}.${this.input.source.collection}`
+        const to = this.input.target.name
         return JSON.stringify({ name, from, to })
     }
 
     public get context() { return this._context }
-    public get data() { return this._data }
+    public get input() { return this._input }
     protected get logger() { return this.context.logger }
-    protected get attempts() { return this.data.settings.attempts }
-    private get stamps() { return this.data.settings.stamps }
-    private get limit() { return this.data.settings.limit }
-    private get window() { return this.data.window }
+    protected get attempts() { return this.input.settings.attempts }
+    private get stamps() { return this.input.settings.stamps }
+    private get limit() { return this.input.settings.limit }
+    private get window() { return this.input.window }
 
     protected async perform() {
 
@@ -51,12 +53,11 @@ export class ExportWorker extends Worker {
             source = await this.source()
             target = await this.target()
 
-            const total = await MongoDBHelper.count(source)
-            this.logger.log(`exporting ${total.toLocaleString('pt-BR')} row(s)...`)
+            let count = await MongoDBHelper.count(source)
+            this.logger.log(`exporting ${count.toLocaleString('pt-BR')} row(s)...`)
 
-            let batch = []
-            let remaining = total
-            let size = 0
+            let rows = []
+            this.statistics = new ExportWorkerStatistics(target.table.temporary, { count })
 
             const cursor = MongoDBHelper.find(source)
             while (await cursor.hasNext()) {
@@ -65,24 +66,12 @@ export class ExportWorker extends Worker {
 
                 const row = this.row(document, now)
 
-                batch.push(row)
+                rows.push(row)
 
-                const flush = (remaining-- % this.limit) === 0 || remaining <= 0
+                const flush = (count-- % this.limit) === 0 || count <= 0
 
                 if (flush) {
-
-                    const table = target.table.temporary
-
-                    const { ingested, current } = this.statistics({ ingested: { size }, remaining, total, data: batch })
-
-                    size = ingested.size
-
-                    this.logger.log(`flushing ${batch.length.toLocaleString('pt-BR')} rows (${bytes(current.size)}) to bigquery temporary table "${table.metadata.id}" (${ingested.percent.toFixed(2)}%, ${ingested.total.toLocaleString('pt-BR')} rows, ${bytes(ingested.size)})...`)
-
-                    await table.insert(batch)
-
-                    batch = []
-
+                    rows = await this.insert({ table: target.table.temporary, rows })
                 }
 
             }
@@ -110,11 +99,30 @@ export class ExportWorker extends Worker {
 
     }
 
+    private async insert({ table, rows }: ExportWorkerInsertInput) {
+
+        const included = rows
+        const excluded = []
+
+        while (this.statistics?.simulate({ rows: included }).broken) {
+            const row = included.pop()
+            excluded.push(row)
+        }
+
+        await table.insert(included)
+
+        this.statistics?.update({ rows: included })
+        this.logger.log(`flushing ${this.statistics}...`)
+
+        return excluded
+
+    }
+
     private async source(): Promise<ExportWorkerSource> {
 
         const service = Regex.inject(SourceService)
 
-        const { name, database, collection } = this.data.source
+        const { name, database, collection } = this.input.source
 
         const { url } = await service.find({ name }).next() as Source
 
@@ -130,13 +138,13 @@ export class ExportWorker extends Worker {
 
         const service = Regex.inject(TargetService)
 
-        const { name } = this.data.target
+        const { name } = this.input.target
 
         const { credentials } = await service.find({ name }).next() as Target
 
         const client = new BigQuery({ credentials })
 
-        const { database } = this.data.source
+        const { database } = this.input.source
 
         const dataset = BigQueryHelper.sanitize({ value: `${this.stamps.dataset.name}${database}` })
 
@@ -149,12 +157,12 @@ export class ExportWorker extends Worker {
 
     private table(type: 'main' | 'temporary') {
 
-        const { collection } = this.data.source
+        const { collection } = this.input.source
 
         let name = BigQueryHelper.sanitize({ value: collection })
 
         if (type === 'temporary') {
-            name = BigQueryHelper.sanitize({ value: `${name}_${this.data.transaction}_temp` })
+            name = BigQueryHelper.sanitize({ value: `${name}_${this.input.transaction}_temp` })
         }
 
         return {
@@ -250,16 +258,70 @@ export class ExportWorker extends Worker {
 
     }
 
-    private statistics({ total, remaining, ingested, data }: ExportWorkerStatisticsInput) {
-        const size = data.map(sizeof).reduce((sum, value) => sum + value, 0)
-        return {
-            ingested: {
-                total: total - remaining,
-                percent: (1 - (remaining / total)) * 100,
-                size: ingested.size + size
-            },
-            current: { size }
+}
+
+type ExportWorkerStatisticsRemaining = { count: number }
+type ExportWorkerStatisticsIngested = { count: number, bytes: number, percent: number }
+type ExportWorkerStatisticsCurrent = { count: number, bytes: number }
+type ExportWorkerStatisticsUpdateInput = { rows: any[] }
+
+class ExportWorkerStatistics {
+
+    private _remaining: ExportWorkerStatisticsRemaining
+    private _ingested: ExportWorkerStatisticsIngested = { count: 0, bytes: 0, percent: 0 }
+    private _current: ExportWorkerStatisticsCurrent = { count: 0, bytes: 0 }
+    private _broken = false
+
+    constructor(
+        private readonly table: Table,
+        _remaining: ExportWorkerStatisticsRemaining
+    ) {
+        this._remaining = _remaining
+    }
+
+    public get broken() { return this._broken }
+
+    public simulate({ rows }: ExportWorkerStatisticsUpdateInput) {
+
+        const __current = {
+            count: rows.length,
+            bytes: rows.map(sizeof).reduce((sum, value) => sum + value, 0)
         }
+
+        const __remaining = {
+            count: this._remaining.count - __current.count
+        }
+
+        const count = this._ingested.count + __current.count
+
+        const __ingested = {
+            count,
+            bytes: this._ingested.bytes + __current.bytes,
+            percent: (count / (__remaining.count + count)) * 100
+        }
+
+        // https://cloud.google.com/bigquery/quotas#streaming_inserts
+        const broken = __ingested.bytes > bytes('17MB')
+
+        return {
+            current: __current,
+            ingested: __ingested,
+            remaining: __remaining,
+            broken
+        }
+
+    }
+
+    public update(input: ExportWorkerStatisticsUpdateInput) {
+        const { current, ingested, remaining, broken } = this.simulate(input)
+        this._current = current
+        this._ingested = ingested
+        this._remaining = remaining
+        this._broken = broken
+    }
+
+    public toString() {
+        return `${this._current.count.toLocaleString('pt-BR')} rows (${bytes(this._current.bytes)}) to bigquery temporary table "${this.table.metadata.id}" (${this._ingested.percent.toFixed(2)}%, ${this._ingested.count.toLocaleString('pt-BR')} rows, ${bytes(this._ingested.bytes)})`
     }
 
 }
