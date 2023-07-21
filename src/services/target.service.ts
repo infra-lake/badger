@@ -5,6 +5,8 @@ import { Regex } from '../regex'
 import { SettingsService } from './settings.service'
 import { BigQuery } from '@google-cloud/bigquery'
 import { MongoDBDocument, MongoDBHelper } from '../helpers/mongodb.helper'
+import { StringHelper } from '../helpers/string.helper'
+import { ExportService } from './export.service'
 
 export interface Target extends MongoDBDocument<Target, 'name'> {
     name: string
@@ -47,7 +49,7 @@ export class TargetService {
             throw new BadRequestError('target is empty')
         }
 
-        if (!ObjectHelper.has(entity.name)) {
+        if (StringHelper.empty(entity.name)) {
             throw new BadRequestError('target.name is empty')
         }
 
@@ -60,6 +62,26 @@ export class TargetService {
         } catch (error) {
             throw new BadRequestError(`does not possible to connect at google big query with received credentials, error:`, error)
         }
+
+    }
+
+    public async delete({ name }: Pick<Target, 'name'>) {
+        
+        if (StringHelper.empty(name)) {
+            throw new BadRequestError(`target.name is empty`)
+        }
+
+        const _export = Regex.inject(ExportService)
+        const count = await _export.count({ target: { name } })
+        if (count > 0) {
+            throw new BadRequestError(`there are ${count} exports containing target "${name}"`)
+        }
+
+        const client = Regex.inject(MongoClient)
+        const { database } = Regex.inject(SettingsService)
+        const id = { name }
+
+        await MongoDBHelper.delete({ client, database, collection: TargetService.COLLECTION, id })
 
     }
 

@@ -17,9 +17,10 @@ export type CountInput<T extends Document = Document> = { client: MongoClient, d
 export type ExistsInput<T extends Document = Document> = CountInput<T>
 export type SaveInput<T extends MongoDBDocument<T, K>, K extends keyof T> = { client: MongoClient, database: string, collection: string, id: Pick<T, K>, document: T }
 export type LastInput = { client: MongoClient, database: string, collection: string, match: any, id: string, sortBy: any, output: string[] }
+export type DeleteInput<T extends MongoDBDocument<T, K>, K extends keyof T> = { client: MongoClient, database: string, collection: string; id: Pick<T, K> }
 
 export class MongoDBHelper {
-
+    
     private constructor() { }
 
     public static async databases({ client }: DatabasesInput) {
@@ -62,6 +63,10 @@ export class MongoDBHelper {
             return
         }
         await client.db(database).collection(collection).insertOne(document)
+    }
+
+    public static async delete<T extends MongoDBDocument<T, K>, K extends keyof T>({ client, database, collection, id }: DeleteInput<T, K>) {
+        await client.db(database).collection(collection).deleteOne(id)
     }
 
 }

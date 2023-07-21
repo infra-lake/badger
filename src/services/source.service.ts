@@ -4,6 +4,8 @@ import { MongoDBDocument, MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
 import { Regex } from '../regex'
 import { SettingsService } from './settings.service'
+import { StringHelper } from '../helpers/string.helper'
+import { ExportService } from './export.service'
 
 export interface Source extends MongoDBDocument<Source, 'name'> {
     name: string
@@ -11,7 +13,7 @@ export interface Source extends MongoDBDocument<Source, 'name'> {
 }
 
 export class SourceService {
-
+    
     public static readonly COLLECTION = 'sources'
 
     public find(filter: Partial<Source>, options?: FindOptions<Source>) {
@@ -53,11 +55,11 @@ export class SourceService {
             throw new BadRequestError('source is empty')
         }
 
-        if (!ObjectHelper.has(document.name)) {
+        if (StringHelper.empty(document.name)) {
             throw new BadRequestError('source.name is empty')
         }
 
-        if (!ObjectHelper.has(document.url)) {
+        if (StringHelper.empty(document.url)) {
             throw new BadRequestError('source.url is empty')
         }
 
@@ -66,6 +68,26 @@ export class SourceService {
         } catch (error) {
             throw new BadRequestError(`does not possible to connect at mongodb with received url, error:`, error)
         }
+
+    }
+
+    public async delete({ name }: Pick<Source, 'name'>) {
+        
+        if (StringHelper.empty(name)) {
+            throw new BadRequestError(`source.name is empty`)
+        }
+
+        const _export = Regex.inject(ExportService)
+        const count = await _export.count({ source: { name } as any })
+        if (count > 0) {
+            throw new BadRequestError(`there are ${count} exports containing source "${name}"`)
+        }
+
+        const client = Regex.inject(MongoClient)
+        const { database } = Regex.inject(SettingsService)
+        const id = { name }
+
+        await MongoDBHelper.delete({ client, database, collection: SourceService.COLLECTION, id })
 
     }
 

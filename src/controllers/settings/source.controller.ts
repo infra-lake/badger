@@ -62,4 +62,21 @@ export class SourceSettingsController implements RegexHTTPController {
 
     }
 
+    public async delete(request: HTTPIncomingMessage, response: HTTPServerResponse) {
+
+        if (!AuthHelper.validate(request, response)) {
+            return
+        }
+
+        const { searchParams } = request.getURL()
+        const { name } = QueryStringHelper.parse(searchParams)
+
+        const service = Regex.inject(SourceService)
+        await service.delete({ name })
+
+        response.write(JSON.stringify({ transaction: request.transaction }))
+        response.end()
+        
+    }
+
 }

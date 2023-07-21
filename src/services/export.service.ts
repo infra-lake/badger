@@ -1,4 +1,4 @@
-import { Document, FindOptions, MongoClient } from 'mongodb'
+import { CountOptions, Document, FindOptions, MongoClient } from 'mongodb'
 import { BadRequestError } from '../exceptions/badrequest.error'
 import { EnvironmentHelper } from '../helpers/environment.helper'
 import { MongoDBDocument, MongoDBHelper } from '../helpers/mongodb.helper'
@@ -6,10 +6,11 @@ import { ObjectHelper } from '../helpers/object.helper'
 import { RabbitMQHelper } from '../helpers/rabbitmq.helper'
 import { Stamps, StampsHelper } from '../helpers/stamps.helper'
 import { Window } from '../helpers/window.helper'
-import { Regex, TransactionalContext } from '../regex'
+import { Regex } from '../regex'
 import { SettingsService } from './settings.service'
 import { SourceService } from './source.service'
 import { TargetService } from './target.service'
+import { StringHelper } from '../helpers/string.helper'
 
 export interface ExportSource {
     name: string
@@ -100,6 +101,20 @@ export class ExportService {
 
         return undefined
 
+    }
+
+    public async count(filter: Partial<Export>, options?: CountOptions) {
+        const client = Regex.inject(MongoClient)
+        const { database } = Regex.inject(SettingsService)
+        const result = MongoDBHelper.count({ client, database, collection: ExportService.COLLECTION, filter, options })
+        return result
+    }
+
+    public async exists(filter: Partial<Export>, options?: CountOptions) {
+        const client = Regex.inject(MongoClient)
+        const { database } = Regex.inject(SettingsService)
+        const result = MongoDBHelper.exists({ client, database, collection: ExportService.COLLECTION, filter, options })
+        return result
     }
 
     public async create(input: Export4Create) {
@@ -252,6 +267,36 @@ export class ExportService {
             }
 
         }
+
+    }
+
+    public async delete({ transaction, source, target }: Pick<Export, 'transaction' | 'source' | 'target'>) {
+        
+        if (StringHelper.empty(transaction)) {
+            throw new BadRequestError(`export.transaction is empty`)
+        }
+
+        if (!ObjectHelper.has(source)) {
+            throw new BadRequestError(`export.source is empty`)
+        }
+
+        if (StringHelper.empty(source.name)) {
+            throw new BadRequestError(`export.source.name is empty`)
+        }
+
+        if (!ObjectHelper.has(target)) {
+            throw new BadRequestError(`export.target is empty`)
+        }
+
+        if (StringHelper.empty(target.name)) {
+            throw new BadRequestError(`export.target.name is empty`)
+        }
+
+        const client = Regex.inject(MongoClient)
+        const { database } = Regex.inject(SettingsService)
+        const id = { transaction, source: { name: source.name }, target: { name: target.name } }
+
+        await MongoDBHelper.delete({ client, database, collection: ExportService.COLLECTION, id })
 
     }
 

@@ -6,7 +6,7 @@ import { Export4Create, ExportService } from '../services/export.service'
 
 export class ExportController implements RegexHTTPController {
 
-    public static readonly path = '^/export'
+    public static readonly path = '^/export$'
 
     public async post(request: HTTPIncomingMessage, response: HTTPServerResponse) {
 
@@ -61,6 +61,23 @@ export class ExportController implements RegexHTTPController {
                 response.end()
             })
 
+    }
+
+    public async delete(request: HTTPIncomingMessage, response: HTTPServerResponse) {
+
+        if (!AuthHelper.validate(request, response)) {
+            return
+        }
+
+        const { searchParams } = request.getURL()
+        const { transaction, source, target } = QueryStringHelper.parse(searchParams)
+
+        const service = Regex.inject(ExportService)
+        await service.delete({ transaction, source, target })
+
+        response.write(JSON.stringify({ transaction: request.transaction }))
+        response.end()
+        
     }
 
 }
