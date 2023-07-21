@@ -43,12 +43,10 @@ export type Export4Update = Pick<Export, 'status' | 'error'>
 
 export class ExportService {
 
-    private static readonly DEFAULT_EXPORT_ATTEMPS = '3'
-    private static readonly DEFAULT_EXPORT_LIMIT = '1000'
     public static readonly COLLECTION = 'exports'
 
-    public static get EXPORT_ATTEMPS() { return parseInt(EnvironmentHelper.get('EXPORT_ATTEMPS', ExportService.DEFAULT_EXPORT_ATTEMPS)) }
-    public static get EXPORT_LIMIT() { return parseInt(EnvironmentHelper.get('EXPORT_LIMIT', ExportService.DEFAULT_EXPORT_LIMIT)) }
+    public static get EXPORT_ATTEMPS() { return parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_ATTEMPS', '3')) }
+    public static get EXPORT_LIMIT() { return parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_LIMIT', '1000')) }
 
     public static filter(stamps: Stamps, window: Window): Document {
 
