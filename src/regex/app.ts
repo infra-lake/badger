@@ -1,9 +1,11 @@
 import { InvalidParameterError } from '../exceptions/invalidparameter.error'
 import { RabbitMQ, RabbitMQBootstrapOutput } from './rabbitmq'
 import { HTTP, HTTPBootstrapOutput } from './http'
+import { Regex } from './ioc'
+import { Logger } from './logger'
 
 export type Settings = { http?: boolean, rabbitmq?: boolean }
-export type StartupInput = ({ http?: HTTPBootstrapOutput, rabbitmq?: RabbitMQBootstrapOutput })
+export type StartupInput = ({ logger: Logger, http?: HTTPBootstrapOutput, rabbitmq?: RabbitMQBootstrapOutput })
 export type Startup = ((input: StartupInput) => Promise<void>) | ((input: StartupInput) => void)
 export type Shutdown = (() => Promise<void>) | (() => void) | undefined
 export type RegexAppCreateInput = { settings: Settings, startup: Startup, shutdown?: Shutdown }
@@ -21,25 +23,48 @@ export class RegexApplication {
 
     public static async create({ settings, startup, shutdown }: RegexAppCreateInput) {
 
-        process.on('SIGILL', exit(shutdown))
-        process.on('SIGTERM', exit(shutdown))
-        process.on('SIGINT', exit(shutdown))
+        const logger = Regex.register(Logger)
 
-        const { http = false, rabbitmq = false } = settings
+        try {
 
-        const input: StartupInput = {}
+            logger.log(`\n
+██▀███  ▓█████   ▄████ ▓█████ ▒██   ██▒    █████▒██▀███   ▄▄▄       ███▄ ▄███▓▓█████  █     █░ ▒█████   ██▀███   ██ ▄█▀
+▓██ ▒ ██▒▓█   ▀  ██▒ ▀█▒▓█   ▀ ▒▒█ █ ▒░   ▓██   ▒▓██ ▒ ██▒▒████▄    ▓██▒▀█▀ ██▒▓█   ▀ ▓█░ █ ░█░▒██▒  ██▒▓██ ▒ ██▒ ██▄█▒ 
+▓██ ░▄█ ▒▒███   ▒██░▄▄▄░▒███   ░░ █   ░   ▒████ ░▓██ ░▄█ ▒▒██  ▀█▄  ▓██    ▓██░▒███   ▒█░ █ ░█ ▒██░  ██▒▓██ ░▄█ ▒▓███▄░ 
+▒██▀▀█▄  ▒▓█  ▄ ░▓█  ██▓▒▓█  ▄  ░█ █ ▒    ░▓█▒  ░▒██▀▀█▄  ░██▄▄▄▄██ ▒██    ▒██ ▒▓█  ▄ ░█░ █ ░█ ▒██   ██░▒██▀▀█▄  ▓██ █▄ 
+░██▓ ▒██▒░▒████▒░▒▓███▀▒░▒████▒▒██▒▒██▒   ░▒█░   ░██▓ ▒██▒ ▓█   ▓██▒▒██▒   ░██▒░▒████▒░░██▒██▓ ░ ████▓▒░░██▓ ▒██▒▒██▒ █▄
+░ ▒▓ ░▒▓░░░ ▒░ ░ ░▒   ▒ ░░ ▒░ ░▒▒ ░ ░▓ ░    ▒ ░   ░ ▒▓ ░▒▓░ ▒▒   ▓▒█░░ ▒░   ░  ░░░ ▒░ ░░ ▓░▒ ▒  ░ ▒░▒░▒░ ░ ▒▓ ░▒▓░▒ ▒▒ ▓▒
+  ░▒ ░ ▒░ ░ ░  ░  ░   ░  ░ ░  ░░░   ░▒ ░    ░       ░▒ ░ ▒░  ▒   ▒▒ ░░  ░      ░ ░ ░  ░  ▒ ░ ░    ░ ▒ ▒░   ░▒ ░ ▒░░ ░▒ ▒░
+  ░░   ░    ░   ░ ░   ░    ░    ░    ░      ░ ░     ░░   ░   ░   ▒   ░      ░      ░     ░   ░  ░ ░ ░ ▒    ░░   ░ ░ ░░ ░ 
+   ░        ░  ░      ░    ░  ░ ░    ░               ░           ░  ░       ░      ░  ░    ░        ░ ░     ░     ░  ░   
+            `)
+            
+            process.on('SIGILL', exit(shutdown))
+            process.on('SIGTERM', exit(shutdown))
+            process.on('SIGINT', exit(shutdown))
+    
+            const { http = false, rabbitmq = false } = settings
+    
+            const input: StartupInput = { logger }
+    
+            if (http) {
+                input.http = await HTTP.bootstrap()
+            }
+    
+            if (rabbitmq) {
+                input.rabbitmq = await RabbitMQ.bootstrap()
+            }
+            
+            await startup(input)
 
-        if (http) {
-            input.http = await HTTP.bootstrap()
+        } catch (error) {
+            logger.error('unexpected error:', error)
+        } finally {
+            Regex.unregister(logger)
         }
-
-        if (rabbitmq) {
-            input.rabbitmq = await RabbitMQ.bootstrap()
-        }
-
-        await startup(input)
 
     }
+
 }
 
 function exit(shutdown: Shutdown) {

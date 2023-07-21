@@ -11,7 +11,7 @@ import { TargetSettingsController } from './controllers/settings/target.controll
 import { ApplicationHelper } from './helpers/application.helper'
 import { EnvironmentHelper } from './helpers/environment.helper'
 import { MetricHelper } from './helpers/metric.helper'
-import { Logger, Regex, RegexApplication, StartupInput } from './regex'
+import { Regex, RegexApplication, StartupInput } from './regex'
 import { ExportService } from './services/export.service'
 import { SettingsService } from './services/settings.service'
 import { SourceService } from './services/source.service'
@@ -38,16 +38,28 @@ Regex.controller(ExportWorkerController)
 
 RegexApplication.create({
     settings: { http: true, rabbitmq: true },
-    startup: async ({ http }: StartupInput) => {
+    startup: async ({ logger, http }: StartupInput) => {
 
         const settings = Regex.inject(SettingsService)
         await settings.migrate()
 
         const port = ApplicationHelper.PORT
         http?.server.listen(port, () => {
-            const logger = Regex.register(Logger)
+
+            logger.log(`\n
+▄▄▄▄    ▄▄▄      ▓█████▄   ▄████ ▓█████  ██▀███  
+▓█████▄ ▒████▄    ▒██▀ ██▌ ██▒ ▀█▒▓█   ▀ ▓██ ▒ ██▒
+▒██▒ ▄██▒██  ▀█▄  ░██   █▌▒██░▄▄▄░▒███   ▓██ ░▄█ ▒
+▒██░█▀  ░██▄▄▄▄██ ░▓█▄   ▌░▓█  ██▓▒▓█  ▄ ▒██▀▀█▄  
+░▓█  ▀█▓ ▓█   ▓██▒░▒████▓ ░▒▓███▀▒░▒████▒░██▓ ▒██▒
+░▒▓███▀▒ ▒▒   ▓▒█░ ▒▒▓  ▒  ░▒   ▒ ░░ ▒░ ░░ ▒▓ ░▒▓░
+▒░▒   ░   ▒   ▒▒ ░ ░ ▒  ▒   ░   ░  ░ ░  ░  ░▒ ░ ▒░
+ ░    ░   ░   ▒    ░ ░  ░ ░ ░   ░    ░     ░░   ░ 
+ ░            ░  ░   ░          ░    ░  ░   ░     
+      ░            ░                              
+            `)
+            
             logger.log('badger was successfully started on port', port)
-            Regex.unregister(logger)
         })
 
     }

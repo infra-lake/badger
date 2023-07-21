@@ -36,20 +36,3 @@ services:
     restart: always
     depends_on:
     - mongodb
-
-  # # APP #######################################################
-  # app:
-  #   build:
-  #     context: ../
-  #     dockerfile: ./.docker/Dockerfile.debug
-  #   container_name: app
-  #   restart: always
-  #   environment:
-  #     MONGODB_URL: ${MONGODB_URL:-mongodb://mongodb:mongodb@mongodb:27017}
-  #     MONGODB_DATABASE: ${MONGODB_DATABASE:-settings}
-  #   ports:
-  #   - "${PORT:-4000}:${PORT:-4000}"
-  #   - "9229:9229"
-  #   depends_on:
-  #   - mongodb
-  #   - redis
