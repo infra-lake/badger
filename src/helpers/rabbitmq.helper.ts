@@ -168,7 +168,7 @@ export class RabbitMQHelper {
 
         const response = await HTTPHelper.request({
             logger,
-            url: `${urls.http}/${RabbitMQHelper.vhost}`, options: {
+            url: `${urls.http}/api/queues/${RabbitMQHelper.vhost}`, options: {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
