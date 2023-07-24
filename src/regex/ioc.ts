@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import { ObjectHelper } from '../helpers/object.helper'
 import { RegexHTTPController } from './http'
 import { RegexRabbitMQController } from './rabbitmq'
+import { StringHelper } from '../helpers/string.helper'
 
 export enum RegexField {
     ID = '__regex_ioc_id',
@@ -181,6 +182,11 @@ export class Regex {
     }
 
     public static unregister<T>(key: RegexKey<T> | any) {
+
+        if (!ObjectHelper.has(key) ||
+            (typeof key === 'string' && StringHelper.empty(key))) {
+            return
+        }
 
         const text: string =
             typeof key === 'string'

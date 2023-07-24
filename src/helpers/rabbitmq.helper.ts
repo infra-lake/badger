@@ -124,6 +124,8 @@ export interface RabbitMQIncomingMessage extends ConsumeMessage, TransactionalCo
     json<T>(): T
 }
 
+export type RabbitMQQueuesInput = { logger: Logger }
+
 export class RabbitMQHelper {
 
     private static _connection?: IAmqpConnectionManager = undefined
@@ -158,14 +160,15 @@ export class RabbitMQHelper {
         return RabbitMQHelper
     }
 
-    public static async queues(): Promise<Array<RabbitMQQueue>> {
+    public static async queues({ logger }: RabbitMQQueuesInput): Promise<Array<RabbitMQQueue>> {
 
         const { urls } = RabbitMQHelper
 
         const [username, password] = urls.amqp[0].substring(urls.amqp[0].indexOf('://') + 3, urls.amqp[0].indexOf('@')).split(':')
 
         const response = await HTTPHelper.request({
-            url: `${urls.http}/api/queues/${RabbitMQHelper.vhost}`, options: {
+            logger,
+            url: `${urls.http}  ${RabbitMQHelper.vhost}`, options: {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',

@@ -1,9 +1,9 @@
-import { Channel, ConsumeMessage, Options } from 'amqplib'
+import { Channel, Options } from 'amqplib'
 import { ObjectHelper } from '../helpers/object.helper'
-import { RabbitMQIncomingMessage, RabbitMQHelper } from '../helpers/rabbitmq.helper'
-import { Regex, RegexField } from './ioc'
+import { RabbitMQHelper, RabbitMQIncomingMessage } from '../helpers/rabbitmq.helper'
 import { RegexApplication } from './app'
-import { TransactionalContext } from './context'
+import { Regex, RegexField } from './ioc'
+import { Logger } from './logger'
 
 export type RabbitMQBootstrapOutput = { rabbitmq: RabbitMQHelper }
 
@@ -24,41 +24,53 @@ export class RabbitMQ {
 
         setInterval(async () => {
 
-            const queues = await rabbitmq.queues()
+            let logger = undefined
 
-            const bindings = queues
-                .map(({ name }) => {
+            try {
 
-                    const result = Regex.inject<RegexRabbitMQController | Array<RegexRabbitMQController>>(name, 'rabbitmq')
+                logger = Regex.register(Logger)
 
-                    return {
-                        queue: name,
-                        controllers:
-                            !ObjectHelper.has(result)
-                                ? []
-                                : Array.isArray(result) ? result : [result]
-                    }
+                const queues = await rabbitmq.queues({ logger })
 
-                })
-                .filter(({ controllers }) => controllers.length > 0)
+                const bindings = queues
+                    .map(({ name }) => {
 
-            await Promise.all(bindings.flatMap(async ({ queue, controllers }) =>
-                await Promise.all(controllers.flatMap(async controller => {
+                        const result = Regex.inject<RegexRabbitMQController | Array<RegexRabbitMQController>>(name, 'rabbitmq')
 
-                    const id = (controller as any)[RegexField.ID]
+                        return {
+                            queue: name,
+                            controllers:
+                                !ObjectHelper.has(result)
+                                    ? []
+                                    : Array.isArray(result) ? result : [result]
+                        }
 
-                    const { handle, config } = controller
-                    const { options } = config
-
-                    await rabbitmq.consume({
-                        consumer: id,
-                        queue,
-                        handle: handle.bind(controller),
-                        options
                     })
+                    .filter(({ controllers }) => controllers.length > 0)
 
-                }))
-            ))
+                await Promise.all(bindings.flatMap(async ({ queue, controllers }) =>
+                    await Promise.all(controllers.flatMap(async controller => {
+
+                        const id = (controller as any)[RegexField.ID]
+
+                        const { handle, config } = controller
+                        const { options } = config
+
+                        await rabbitmq.consume({
+                            consumer: id,
+                            queue,
+                            handle: handle.bind(controller),
+                            options
+                        })
+
+                    }))
+                ))
+
+            } catch (error) {
+                logger?.error('Error when retrieve queues:', error)
+            } finally {
+                Regex.unregister(logger)
+            }
 
         }, RegexApplication.TICK)
 

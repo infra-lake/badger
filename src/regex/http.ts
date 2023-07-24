@@ -13,6 +13,7 @@ export interface HTTPIncomingMessage extends IncomingMessage, TransactionalConte
     getURL(): URL
     body(): Promise<string>
     json<T>(): Promise<T>
+    ok(): boolean
 }
 
 export interface HTTPServerResponse extends ServerResponse {
@@ -42,7 +43,7 @@ export class HTTP {
 
 async function listener(request: IncomingMessage, response: ServerResponse) {
 
-    const _request = HTTPHelper.incoming({ message: request, transactional: true })
+    const _request = HTTPHelper.incoming({ message: request })
     const _response = HTTPHelper.response(response)
 
     try {

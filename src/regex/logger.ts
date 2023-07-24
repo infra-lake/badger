@@ -1,5 +1,11 @@
 import { randomUUID } from 'crypto'
+import { EnvironmentHelper } from '../helpers/environment.helper'
 import { HTTPIncomingMessage } from './http'
+
+export enum LogMode {
+    DEBUG = 'debug',
+    INFO = 'info'
+}
 
 export class Logger {
 
@@ -15,12 +21,17 @@ export class Logger {
         return request.logger as Logger
     }
 
-    public get transaction() { return this._transaction  }
+    public get transaction() { return this._transaction }
+    public get mode() { return (LogMode as any)[EnvironmentHelper.get('LOG_MODE', 'info')] as LogMode }
 
     public error(message: any, ...fields: any[]) { console.error(this.transaction, message, ...fields) }
     public warn(message: any, ...fields: any[]) { console.warn(this.transaction, message, ...fields) }
     public log(message: any, ...fields: any[]) { console.log(this.transaction, message, ...fields) }
     public info(message: any, ...fields: any[]) { console.info(this.transaction, message, ...fields) }
-    public debug(message: any, ...fields: any[]) { console.debug(this.transaction, message, ...fields) }
+    public debug(message: any, ...fields: any[]) {
+        if (this.mode === LogMode.DEBUG) {
+            console.debug(this.transaction, message, ...fields)
+        }
+    }
 
 }
