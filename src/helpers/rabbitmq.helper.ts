@@ -145,13 +145,13 @@ export class RabbitMQHelper {
 
     public static get urls() {
         return {
-            amqp: EnvironmentHelper.get('RABBITMQ_AMQP_URLS', '').split(',').filter(url => url),
-            http: EnvironmentHelper.get('RABBITMQ_HTTP_URL', '')
+            amqp: EnvironmentHelper.get('RABBITMQ_AMQP_URLS', '').split(',').map(url => url.trim()).filter(url => url),
+            http: EnvironmentHelper.get('RABBITMQ_HTTP_URL', '').trim()
         }
     }
 
     public static get vhost() {
-        const result = EnvironmentHelper.get('RABBITMQ_AMQP_VHOST', '%2F')
+        const result = EnvironmentHelper.get('RABBITMQ_AMQP_VHOST', '%2F').trim()
         return result
     }
 
@@ -164,11 +164,11 @@ export class RabbitMQHelper {
 
         const { urls } = RabbitMQHelper
 
-        const [username, password] = urls.amqp[0].substring(urls.amqp[0].indexOf('://') + 3, urls.amqp[0].indexOf('@')).split(':')
+        const [username, password] = urls.amqp[0].substring(urls.amqp[0].indexOf('://') + 3, urls.amqp[0].indexOf('@')).split(':').map(item => item.trim())
 
         const response = await HTTPHelper.request({
             logger,
-            url: `${urls.http}  ${RabbitMQHelper.vhost}`, options: {
+            url: `${urls.http}${RabbitMQHelper.vhost}`, options: {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
