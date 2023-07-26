@@ -1,8 +1,7 @@
 import { BigQuery, BigQueryTimestamp, Table } from '@google-cloud/bigquery'
-import bytes from 'bytes'
 import { createHash } from 'crypto'
 import { MongoClient } from 'mongodb'
-import sizeof from 'object-sizeof'
+import { ExportStatistics } from '../helpers/export.helper'
 import { MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
 import { StampsHelper } from '../helpers/stamps.helper'
@@ -17,7 +16,7 @@ type ExportWorkerInsertInput = { table: Table, rows: any[], ingested: Ingested }
 
 export class ExportWorker extends Worker {
 
-    private statistics?: ExportWorkerStatistics = undefined
+    private statistics?: ExportStatistics = undefined
 
     public constructor(
         private readonly _context: TransactionalContext,
@@ -57,7 +56,7 @@ export class ExportWorker extends Worker {
 
             const ingested = await this.ingested()
 
-            this.statistics = new ExportWorkerStatistics(target.table.temporary, { count: count - ingested.hashs.length })
+            this.statistics = new ExportStatistics(target.table.temporary, { count: count - ingested.hashs.length })
 
             let rows: any[] = []
 
@@ -262,72 +261,6 @@ export class ExportWorker extends Worker {
                     )
             `)
 
-    }
-
-}
-
-type ExportWorkerStatisticsRemaining = { count: number }
-type ExportWorkerStatisticsIngested = { count: number, bytes: number, percent: number }
-type ExportWorkerStatisticsCurrent = { count: number, bytes: number }
-type ExportWorkerStatisticsUpdateInput = { rows: any[], ingested: Ingested }
-
-class ExportWorkerStatistics {
-
-    private _remaining: ExportWorkerStatisticsRemaining
-    private _ingested: ExportWorkerStatisticsIngested = { count: 0, bytes: 0, percent: 0 }
-    private _current: ExportWorkerStatisticsCurrent = { count: 0, bytes: 0 }
-    private _broken = false
-
-    constructor(
-        private readonly table: Table,
-        _remaining: ExportWorkerStatisticsRemaining
-    ) {
-        this._remaining = _remaining
-    }
-
-    public get broken() { return this._broken }
-
-    public simulate({ rows, ingested }: ExportWorkerStatisticsUpdateInput) {
-
-        const __current = {
-            count: rows.length,
-            bytes: rows.map(sizeof).reduce((sum, value) => sum + value, 0)
-        }
-
-        const __remaining = {
-            count: this._remaining.count - __current.count
-        }
-
-        const count = ingested.hashs.length
-
-        const __ingested = {
-            count,
-            bytes: this._ingested.bytes + __current.bytes,
-            percent: (ingested.hashs.length / (count + __remaining.count)) * 100
-        }
-
-        // https://cloud.google.com/bigquery/quotas#streaming_inserts
-        const broken = __ingested.bytes > bytes('17MB')
-
-        return {
-            current: __current,
-            ingested: __ingested,
-            remaining: __remaining,
-            broken
-        }
-
-    }
-
-    public update(input: ExportWorkerStatisticsUpdateInput) {
-        const { current, ingested, remaining, broken } = this.simulate(input)
-        this._current = current
-        this._ingested = ingested
-        this._remaining = remaining
-        this._broken = broken
-    }
-
-    public toString() {
-        return `${this._current.count.toLocaleString('pt-BR')} rows (${bytes(this._current.bytes)}) to bigquery temporary table "${this.table.metadata.id}" (${this._ingested.percent.toFixed(2)}%, ${this._ingested.count.toLocaleString('pt-BR')} rows, ${bytes(this._ingested.bytes)})`
     }
 
 }
