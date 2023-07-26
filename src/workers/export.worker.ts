@@ -3,15 +3,13 @@ import bytes from 'bytes'
 import { createHash } from 'crypto'
 import { MongoClient } from 'mongodb'
 import sizeof from 'object-sizeof'
-import { BigQueryHelper } from '../helpers/bigquery.helper'
 import { MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
 import { StampsHelper } from '../helpers/stamps.helper'
 import { Regex, TransactionalContext, Worker } from '../regex'
-import { Export, ExportService, ExportSource } from '../services/export.service'
+import { Export, ExportService } from '../services/export.service'
 import { Ingested, IngestedService } from '../services/ingested.service'
 import { Source, SourceService } from '../services/source.service'
-import { Target, TargetService } from '../services/target.service'
 
 type ExportWorkerSource = { client: MongoClient, database: string, collection: string, filter: any }
 type ExportWorkerTarget = { client: BigQuery, dataset: string, table: { main: Table, temporary: Table } }
@@ -52,7 +50,7 @@ export class ExportWorker extends Worker {
             this.logger.log('starting export task"', JSON.parse(this.name), '" at "', now.toISOString(), '"')
 
             source = await this.source()
-            target = await this.target(this.input.source)
+            target = await this.target()
 
             let count = await MongoDBHelper.count(source)
             this.logger.log(`exporting ${count.toLocaleString('pt-BR')} row(s)...`)
@@ -75,7 +73,7 @@ export class ExportWorker extends Worker {
                     ingested.hashs.push(row.hash)
                 }
 
-                const flush = ((count-- % this.limit) === 0 || count <= 0) && rows.length > 0
+                const flush = ((--count % this.limit) === 0 || count <= 0) && rows.length > 0
 
                 if (flush) {
                     rows = await this.insert({ table: target.table.temporary, rows, ingested })
@@ -84,8 +82,6 @@ export class ExportWorker extends Worker {
             }
 
             await this.consolidate(target)
-
-            await this.cleanup()
 
             this.logger.log(`exported was successfully finished`)
 
@@ -168,44 +164,22 @@ export class ExportWorker extends Worker {
 
     }
 
-    private async target({ database }: Pick<ExportSource, 'database'>): Promise<ExportWorkerTarget> {
+    private async target(): Promise<ExportWorkerTarget> {
 
-        const service = Regex.inject(TargetService)
+        const transaction = this.input.transaction
 
-        const { name } = this.input.target
+        const service = Regex.inject(ExportService)
 
-        const { credentials } = await service.find({ name }).next() as Target
+        const source = this.input.source
+        const dataset = service.dataset({ prefix: this.stamps.dataset.name, database: source.database })
 
-        const client = new BigQuery({ credentials })
-
-        const dataset = BigQueryHelper.sanitize({ value: `${this.stamps.dataset.name}${database}` })
-
-        const main = await BigQueryHelper.table({ client, dataset, table: this.table('main') })
-        const temporary = await BigQueryHelper.table({ client, dataset, table: this.table('temporary') })
+        const target = this.input.target
+        const client = await service.bigquery(target)
+        const prefix = this.stamps.dataset.name
+        const main = await service.table({ client, transaction, source, prefix, type: 'main', create: true }) as Table
+        const temporary = await service.table({ client, transaction, source, prefix, type: 'temporary', create: true }) as Table
 
         return { client, dataset, table: { main, temporary } }
-
-    }
-
-    private table(type: 'main' | 'temporary') {
-
-        const { collection } = this.input.source
-
-        let name = BigQueryHelper.sanitize({ value: collection })
-
-        if (type === 'temporary') {
-            name = BigQueryHelper.sanitize({ value: `${name}_${this.input.transaction}_temp` })
-        }
-
-        return {
-            name,
-            fields: [
-                { name: StampsHelper.DEFAULT_STAMP_ID, type: 'STRING', mode: 'REQUIRED' },
-                { name: StampsHelper.DEFAULT_STAMP_INSERT, type: 'TIMESTAMP', mode: 'REQUIRED' },
-                { name: 'data', type: 'JSON', mode: 'REQUIRED' },
-                { name: 'hash', type: 'STRING', mode: 'REQUIRED' }
-            ]
-        }
 
     }
 
@@ -287,59 +261,6 @@ export class ExportWorker extends Worker {
                             AND C.${StampsHelper.DEFAULT_STAMP_ID} = temporary.${StampsHelper.DEFAULT_STAMP_ID}
                     )
             `)
-
-    }
-
-    private async cleanup() {
-
-        const _export = Regex.inject(ExportService)
-        const ingested = Regex.inject(IngestedService)
-
-        const exports = _export.find({ status: 'success' })
-        while (await exports.hasNext()) {
-
-            try {
-
-                const { transaction, source, target } = await exports.next() as Export
-
-                const id = { transaction, source, target }
-
-                if (await ingested.exists(id)) {
-                    await ingested.delete(id)
-                }
-
-                const { table } = await this.target(source)
-                await table.temporary.delete({ ignoreNotFound: true })
-
-            } catch (error) {
-                this.logger.error('error when delete temporary ingested data:', error)
-            }
-
-        }
-
-        const ingests = ingested.find({}, { projection: { transaction: 1, source: 1, target: 1 } })
-        while (await ingests.hasNext()) {
-
-            try {
-
-                const { transaction, source, target } = await ingests.next() as Ingested
-
-                const id = { transaction, source, target }
-
-                if (!await _export.exists(id)) {
-
-                    await ingested.delete(id)
-
-                    const { table } = await this.target(source)
-                    await table.temporary.delete({ ignoreNotFound: true })
-
-                }
-
-            } catch (error) {
-                this.logger.error('error when delete temporary ingested data:', error)
-            }
-
-        }
 
     }
 

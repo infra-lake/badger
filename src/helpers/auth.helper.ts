@@ -3,11 +3,16 @@ import { EnvironmentHelper } from "./environment.helper";
 
 export class AuthHelper {
 
-    private static readonly NO_AUTH = 'NO_AUTH'
+    private static readonly NO_AUTH = 'no_auth'
 
     public static validate(request: HTTPIncomingMessage, response: HTTPServerResponse) {
 
         const mode = EnvironmentHelper.get('AUTH_MODE', AuthHelper.NO_AUTH).toLowerCase()
+
+        if (mode === AuthHelper.NO_AUTH) {
+            return true
+        }
+
         const authorization = request.headers['authorization'] ?? ''
         const [strategy = AuthHelper.NO_AUTH, token = ''] = authorization.split(' ').filter(value => value)
         const method = strategy.toLowerCase()

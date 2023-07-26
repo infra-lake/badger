@@ -1,8 +1,10 @@
+import path from 'path'
+import { readFileSync } from 'fs'
 import { InvalidParameterError } from '../exceptions/invalidparameter.error'
-import { RabbitMQ, RabbitMQBootstrapOutput } from './rabbitmq'
 import { HTTP, HTTPBootstrapOutput } from './http'
 import { Regex } from './ioc'
 import { Logger } from './logger'
+import { RabbitMQ, RabbitMQBootstrapOutput } from './rabbitmq'
 
 export type Settings = { http?: boolean, rabbitmq?: boolean }
 export type StartupInput = ({ logger: Logger, http?: HTTPBootstrapOutput, rabbitmq?: RabbitMQBootstrapOutput })
@@ -17,9 +19,9 @@ export class RegexApplication {
     public static set TICK(value: number) {
         if ((value ?? 0) <= 0) {
             throw new InvalidParameterError('tick', 'must be greater than zero')
-        } 
-        RegexApplication._TICK = value 
-    } 
+        }
+        RegexApplication._TICK = value
+    }
 
     public static async create({ settings, startup, shutdown }: RegexAppCreateInput) {
 
@@ -37,23 +39,23 @@ export class RegexApplication {
 ░░╚═╝░░╚═╝╚══════╝░╚═════╝░╚══════╝╚═╝░░╚═╝░░╚═╝░░░░░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░░░░╚═╝╚══════╝░░░╚═╝░░░╚═╝░░░╚════╝░╚═╝░░╚═╝╚═╝░░╚═╝░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
             `)
-            
+
             process.on('SIGILL', exit(shutdown))
             process.on('SIGTERM', exit(shutdown))
             process.on('SIGINT', exit(shutdown))
-    
+
             const { http = false, rabbitmq = false } = settings
-    
+
             const input: StartupInput = { logger }
-    
+
             if (http) {
                 input.http = await HTTP.bootstrap()
             }
-    
+
             if (rabbitmq) {
                 input.rabbitmq = await RabbitMQ.bootstrap()
             }
-            
+
             await startup(input)
 
         } catch (error) {
@@ -62,6 +64,11 @@ export class RegexApplication {
             Regex.unregister(logger)
         }
 
+    }
+
+    public static version() {
+        const { version } = JSON.parse(readFileSync(path.join(`${__dirname}/../../package.json`)).toString('utf-8'))
+        return version
     }
 
 }

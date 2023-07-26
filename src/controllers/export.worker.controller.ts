@@ -39,13 +39,14 @@ export class ExportWorkerController implements RegexRabbitMQController {
 
             message.logger.log(`worker "${worker.name}" finished successfully`)
 
-            service.update(id, { status: 'success' })
+            service.update(message, id, { status: 'success' })
 
         } catch (error: any) {
 
             const _message = 'fail on worker export'
             message.logger.error(_message, error)
             service.update(
+                message,
                 id,
                 {
                     status: 'error',

@@ -61,7 +61,10 @@ RegexApplication.create({
       ░            ░                              
             `)
             
-            logger.log('badger was successfully started on port', port)
+            const version = RegexApplication.version()
+
+            logger.log(`badger v${version} was successfull started on port`, port)
+        
         })
 
     }
