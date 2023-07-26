@@ -1,4 +1,4 @@
-import { AggregateOptions, CountOptions, Document, FindCursor, FindOptions, MongoClient, WithId } from 'mongodb'
+import { AggregateOptions, CountOptions, Document, Filter, FindCursor, FindOptions, MongoClient, WithId } from 'mongodb'
 import Stream from 'stream'
 import { ObjectHelper } from './object.helper'
 import { Stamps } from './stamps.helper'
@@ -11,7 +11,7 @@ export interface MongoDBDocument<T extends MongoDBDocument<T, K>, K extends keyo
 
 export type DatabasesInput = { client: MongoClient }
 export type CollectionsInput = { client: MongoClient, database: string }
-export type FindInput<T extends Document = Document> = { client: MongoClient, database: string, collection: string, filter: T, options?: FindOptions<T> }
+export type FindInput<T extends Document = Document> = { client: MongoClient, database: string, collection: string, filter?: Filter<T>, options?: FindOptions<T> }
 export type GetInput<T extends MongoDBDocument<T, K>, K extends keyof T> = { client: MongoClient, database: string, collection: string, id: Pick<T, K> }
 export type CountInput<T extends Document = Document> = { client: MongoClient, database: string, collection: string, filter: T, options?: CountOptions }
 export type ExistsInput<T extends Document = Document> = CountInput<T>
@@ -34,7 +34,7 @@ export class MongoDBHelper {
     }
 
     public static find<T extends Document = Document>({ client, database, collection, filter, options }: FindInput<T>) {
-        const result = client.db(database).collection(collection).find<T>(filter, options)
+        const result = client.db(database).collection(collection).find<T>(filter as any, options)
         if (ObjectHelper.has(options?.sort)) {
             return result.allowDiskUse()
         }

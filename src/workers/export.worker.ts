@@ -8,13 +8,14 @@ import { MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
 import { StampsHelper } from '../helpers/stamps.helper'
 import { Regex, TransactionalContext, Worker } from '../regex'
-import { Export, ExportService } from '../services/export.service'
+import { Export, ExportService, ExportSource } from '../services/export.service'
+import { Ingested, IngestedService } from '../services/ingested.service'
 import { Source, SourceService } from '../services/source.service'
 import { Target, TargetService } from '../services/target.service'
 
 type ExportWorkerSource = { client: MongoClient, database: string, collection: string, filter: any }
 type ExportWorkerTarget = { client: BigQuery, dataset: string, table: { main: Table, temporary: Table } }
-type ExportWorkerInsertInput = { table: Table, rows: any[] }
+type ExportWorkerInsertInput = { table: Table, rows: any[], ingested: Ingested }
 
 export class ExportWorker extends Worker {
 
@@ -51,13 +52,16 @@ export class ExportWorker extends Worker {
             this.logger.log('starting export task"', JSON.parse(this.name), '" at "', now.toISOString(), '"')
 
             source = await this.source()
-            target = await this.target()
+            target = await this.target(this.input.source)
 
             let count = await MongoDBHelper.count(source)
             this.logger.log(`exporting ${count.toLocaleString('pt-BR')} row(s)...`)
 
-            let rows = []
-            this.statistics = new ExportWorkerStatistics(target.table.temporary, { count })
+            const ingested = await this.ingested()
+
+            this.statistics = new ExportWorkerStatistics(target.table.temporary, { count: count - ingested.hashs.length })
+
+            let rows: any[] = []
 
             const cursor = MongoDBHelper.find(source)
             while (await cursor.hasNext()) {
@@ -66,17 +70,22 @@ export class ExportWorker extends Worker {
 
                 const row = this.row(document, now)
 
-                rows.push(row)
+                if (!ingested.hashs.includes(row.hash)) {
+                    rows.push(row)
+                    ingested.hashs.push(row.hash)
+                }
 
-                const flush = (count-- % this.limit) === 0 || count <= 0
+                const flush = ((count-- % this.limit) === 0 || count <= 0) && rows.length > 0
 
                 if (flush) {
-                    rows = await this.insert({ table: target.table.temporary, rows })
+                    rows = await this.insert({ table: target.table.temporary, rows, ingested })
                 }
 
             }
 
             await this.consolidate(target)
+
+            await this.cleanup()
 
             this.logger.log(`exported was successfully finished`)
 
@@ -85,36 +94,61 @@ export class ExportWorker extends Worker {
             this.logger.error(`error on export:\n\t${error}`)
             throw error
 
-        } finally {
-
-            if (ObjectHelper.has(target)) {
-                try {
-                    await target?.table.temporary.delete({ ignoreNotFound: true })
-                } catch (error) {
-                    console.error(`fail to delete temporary table: ${target?.table.temporary.id}:\n\t${JSON.stringify(error)}`)
-                }
-            }
-
         }
 
     }
 
-    private async insert({ table, rows }: ExportWorkerInsertInput) {
+    private async insert({ table, rows, ingested }: ExportWorkerInsertInput) {
 
-        const included = rows
-        const excluded = []
+        const { hashs } = ingested
 
-        while (this.statistics?.simulate({ rows: included }).broken) {
-            const row = included.pop()
-            excluded.push(row)
+        const included = { rows, hashs }
+        const excluded = { rows: [] as any[], hashs: [] as string[] }
+
+        while (this.statistics?.simulate({ rows: included.rows, ingested }).broken) {
+            excluded.rows.push(included.rows.pop())
+            excluded.hashs.push(included.hashs.pop() as string)
         }
 
-        await table.insert(included)
+        await table.insert(included.rows)
 
-        this.statistics?.update({ rows: included })
+        const service = Regex.inject(IngestedService)
+        ingested.hashs = included.hashs
+        await service.save(ingested)
+
+        ingested.hashs.push(...excluded.hashs)
+
+        this.statistics?.update({ rows: included.rows, ingested })
         this.logger.log(`flushing ${this.statistics}...`)
 
-        return excluded
+        return excluded.rows
+
+    }
+
+    private async ingested() {
+
+        const service = Regex.inject(IngestedService)
+
+        const { transaction, source, target } = this.input
+
+        const cursor = service.find({ transaction, source, target })
+
+        let ingested = null
+
+        if (await cursor.hasNext()) {
+            ingested = await cursor.next()
+        }
+
+        if (!ObjectHelper.has(ingested)) {
+            ingested = { transaction, source, target, hashs: [] }
+            await service.save(ingested)
+        }
+
+        if ((ingested?.hashs.length ?? 0) > 0) {
+            this.logger.log(`${ingested?.hashs.length.toLocaleString('pt-BR')} row(s) already ingested...`)
+        }
+
+        return ingested as Ingested
 
     }
 
@@ -134,7 +168,7 @@ export class ExportWorker extends Worker {
 
     }
 
-    private async target(): Promise<ExportWorkerTarget> {
+    private async target({ database }: Pick<ExportSource, 'database'>): Promise<ExportWorkerTarget> {
 
         const service = Regex.inject(TargetService)
 
@@ -143,8 +177,6 @@ export class ExportWorker extends Worker {
         const { credentials } = await service.find({ name }).next() as Target
 
         const client = new BigQuery({ credentials })
-
-        const { database } = this.input.source
 
         const dataset = BigQueryHelper.sanitize({ value: `${this.stamps.dataset.name}${database}` })
 
@@ -258,12 +290,65 @@ export class ExportWorker extends Worker {
 
     }
 
+    private async cleanup() {
+
+        const _export = Regex.inject(ExportService)
+        const ingested = Regex.inject(IngestedService)
+
+        const exports = _export.find({ status: 'success' })
+        while (await exports.hasNext()) {
+
+            try {
+
+                const { transaction, source, target } = await exports.next() as Export
+
+                const id = { transaction, source, target }
+
+                if (await ingested.exists(id)) {
+                    await ingested.delete(id)
+                }
+
+                const { table } = await this.target(source)
+                await table.temporary.delete({ ignoreNotFound: true })
+
+            } catch (error) {
+                this.logger.error('error when delete temporary ingested data:', error)
+            }
+
+        }
+
+        const ingests = ingested.find({}, { projection: { transaction: 1, source: 1, target: 1 } })
+        while (await ingests.hasNext()) {
+
+            try {
+
+                const { transaction, source, target } = await ingests.next() as Ingested
+
+                const id = { transaction, source, target }
+
+                if (!await _export.exists(id)) {
+
+                    await ingested.delete(id)
+
+                    const { table } = await this.target(source)
+                    await table.temporary.delete({ ignoreNotFound: true })
+
+                }
+
+            } catch (error) {
+                this.logger.error('error when delete temporary ingested data:', error)
+            }
+
+        }
+
+    }
+
 }
 
 type ExportWorkerStatisticsRemaining = { count: number }
 type ExportWorkerStatisticsIngested = { count: number, bytes: number, percent: number }
 type ExportWorkerStatisticsCurrent = { count: number, bytes: number }
-type ExportWorkerStatisticsUpdateInput = { rows: any[] }
+type ExportWorkerStatisticsUpdateInput = { rows: any[], ingested: Ingested }
 
 class ExportWorkerStatistics {
 
@@ -281,7 +366,7 @@ class ExportWorkerStatistics {
 
     public get broken() { return this._broken }
 
-    public simulate({ rows }: ExportWorkerStatisticsUpdateInput) {
+    public simulate({ rows, ingested }: ExportWorkerStatisticsUpdateInput) {
 
         const __current = {
             count: rows.length,
@@ -292,12 +377,12 @@ class ExportWorkerStatistics {
             count: this._remaining.count - __current.count
         }
 
-        const count = this._ingested.count + __current.count
+        const count = ingested.hashs.length
 
         const __ingested = {
             count,
             bytes: this._ingested.bytes + __current.bytes,
-            percent: (count / (__remaining.count + count)) * 100
+            percent: (ingested.hashs.length / (count + __remaining.count)) * 100
         }
 
         // https://cloud.google.com/bigquery/quotas#streaming_inserts

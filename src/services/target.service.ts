@@ -17,6 +17,13 @@ export class TargetService {
 
     public static readonly COLLECTION = 'targets'
 
+    public async get({ name }: Pick<Target, 'name'>) {
+        const client = Regex.inject(MongoClient)
+        const { database } = Regex.inject(SettingsService)
+        const result = await MongoDBHelper.get<Target, 'name'>({ client, database, collection: TargetService.COLLECTION, id: { name } })
+        return result
+    }
+
     public find(filter: Partial<Target>, options?: FindOptions<Target>) {
         const client = Regex.inject(MongoClient)
         const { database } = Regex.inject(SettingsService)

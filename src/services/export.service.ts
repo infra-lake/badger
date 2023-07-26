@@ -1,25 +1,27 @@
-import { CountOptions, Document, FindOptions, MongoClient } from 'mongodb'
+import { BigQuery } from '@google-cloud/bigquery'
+import { CountOptions, Document, Filter, FindOptions, MongoClient } from 'mongodb'
 import { BadRequestError } from '../exceptions/badrequest.error'
 import { EnvironmentHelper } from '../helpers/environment.helper'
 import { MongoDBDocument, MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
 import { RabbitMQHelper } from '../helpers/rabbitmq.helper'
 import { Stamps, StampsHelper } from '../helpers/stamps.helper'
+import { StringHelper } from '../helpers/string.helper'
 import { Window } from '../helpers/window.helper'
 import { Regex } from '../regex'
+import { IngestedService } from './ingested.service'
 import { SettingsService } from './settings.service'
-import { SourceService } from './source.service'
-import { TargetService } from './target.service'
-import { StringHelper } from '../helpers/string.helper'
+import { Source, SourceService } from './source.service'
+import { Target, TargetService } from './target.service'
 
 export interface ExportSource {
-    name: string
+    name: Source['name']
     database: string
     collection: string
 }
 
 export interface ExportTarget {
-    name: string
+    name: Target['name']
 }
 
 export interface ExportSettings {
@@ -38,7 +40,7 @@ export interface Export extends MongoDBDocument<Export, 'transaction' | 'source'
     error?: { message: string, cause: any }
 }
 
-export type Export4Create = Pick<Export, 'transaction' | 'source' | 'target' | 'settings'>
+export type Export4Create = Pick<Export, 'transaction' | 'source' | 'target' | 'settings' | 'window'>
 export type Export4Update = Pick<Export, 'status' | 'error'>
 
 export class ExportService {
@@ -48,41 +50,7 @@ export class ExportService {
     public static get EXPORT_ATTEMPS() { return parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_ATTEMPS', '3')) }
     public static get EXPORT_LIMIT() { return parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_LIMIT', '1000')) }
 
-    public static filter(stamps: Stamps, window: Window): Document {
-
-        const date = {
-            $ifNull: [
-                `$${stamps.update}`,
-                `$${StampsHelper.DEFAULT_STAMP_UPDATE}`,
-                '$updatedAt',
-                '$updated_at',
-                `$${stamps.insert}`,
-                `$${StampsHelper.DEFAULT_STAMP_INSERT}`,
-                '$createdAt',
-                '$created_at',
-                {
-                    $convert: {
-                        input: `$${stamps.id}`,
-                        to: 'date',
-                        onError: window.end,
-                        onNull: window.end
-                    }
-                }
-            ]
-        }
-
-        return {
-            $expr: {
-                $and: [
-                    { $gt: [date, window.begin] },
-                    { $lte: [date, window.end] }
-                ]
-            }
-        }
-
-    }
-
-    public find(filter: Partial<Export>, options?: FindOptions<Export>) {
+    public find(filter: Filter<Export>, options?: FindOptions<Export>) {
         const client = Regex.inject(MongoClient)
         const { database } = Regex.inject(SettingsService)
         const result = MongoDBHelper.find({ client, database, collection: ExportService.COLLECTION, filter, options })
@@ -120,15 +88,12 @@ export class ExportService {
         await this.validate(input);
 
         input.settings = input.settings ?? {}
-        input.settings.attempts = input.settings.attempts ?? ExportService.EXPORT_ATTEMPS
-        input.settings.limit = input.settings.limit ?? ExportService.EXPORT_LIMIT
+        input.settings.attempts = input.settings?.attempts ?? ExportService.EXPORT_ATTEMPS
+        input.settings.limit = input.settings?.limit ?? ExportService.EXPORT_LIMIT
         input.settings.stamps = StampsHelper.extract(input.settings, 'stamps');
-
-        (input as Export).window = {
-            begin: await this.last(input),
-            end: new Date()
-        };
-
+        input.window = input?.window ?? {};
+        input.window.begin = input.window?.begin ?? await this.last(input)
+        input.window.end = input.window?.end ?? new Date();
         (input as Export).status = 'pending'
 
         const client = Regex.inject(MongoClient)
@@ -173,13 +138,54 @@ export class ExportService {
         const client = Regex.inject(MongoClient)
         const { database } = Regex.inject(SettingsService)
 
+        const id = { transaction, source, target }
+
         await MongoDBHelper.save({
             client,
             database,
             collection: ExportService.COLLECTION,
-            id: { transaction, source, target },
+            id,
             document
         })
+
+        if (status === 'success') {
+            const ingested = Regex.inject(IngestedService)
+            await ingested.delete(id)
+        }
+
+    }
+
+    public static filter(stamps: Stamps, window: Window): Document {
+
+        const date = {
+            $ifNull: [
+                `$${stamps.update}`,
+                `$${StampsHelper.DEFAULT_STAMP_UPDATE}`,
+                '$updatedAt',
+                '$updated_at',
+                `$${stamps.insert}`,
+                `$${StampsHelper.DEFAULT_STAMP_INSERT}`,
+                '$createdAt',
+                '$created_at',
+                {
+                    $convert: {
+                        input: `$${stamps.id}`,
+                        to: 'date',
+                        onError: window.end,
+                        onNull: window.end
+                    }
+                }
+            ]
+        }
+
+        return {
+            $expr: {
+                $and: [
+                    { $gt: [date, window.begin] },
+                    { $lte: [date, window.end] }
+                ]
+            }
+        }
 
     }
 
@@ -190,12 +196,17 @@ export class ExportService {
 
         const cursor = client.db(database).collection(ExportService.COLLECTION).aggregate([
             { $match: { source, target, status: 'success' } },
-            { $group: { _id: "transaction", value: { $top: { sortBy: { 'window.end': -1 }, output: ["$window.end"] } } } }
+            {
+                $group: {
+                    _id: { source: "$source", target: "$target" },
+                    value: { $max: "$window.end" }
+                }
+            }
         ])
 
         if (await cursor.hasNext()) {
             const { value } = await cursor.next() as any;
-            return value[0]
+            return value
         }
 
         return new Date(0)
@@ -216,17 +227,35 @@ export class ExportService {
             throw new BadRequestError('export.source.name is empty')
         }
 
-        const source = Regex.inject(SourceService)
-        if (!await source.exists({ name: document.source.name })) {
+        const source = await Regex.inject(SourceService).get({ name: document.source.name })
+        if (!ObjectHelper.has(source)) {
             throw new BadRequestError('export.source.name is invalid or does not exists')
+        }
+
+        let client = undefined
+
+        try {
+            client = new MongoClient(source?.url as string)
+        } catch (error) {
+            throw new BadRequestError(`export.source.name is invalid:`, error)
         }
 
         if (!ObjectHelper.has(document.source.database)) {
             throw new BadRequestError('export.source.database is empty')
         }
 
+        const databases = await MongoDBHelper.databases({ client })
+        if (!databases.map(({ name }) => name).includes(document.source.database)) {
+            throw new BadRequestError('export.source.database is invalid or does not exists')
+        }
+
         if (!ObjectHelper.has(document.source.collection)) {
             throw new BadRequestError('export.source.collection is empty')
+        }
+
+        const collections = await MongoDBHelper.collections({ client, database: document.source.database })
+        if (!collections.map(({ collectionName: name }) => name).includes(document.source.collection)) {
+            throw new BadRequestError('export.source.collection is invalid or does not exists')
         }
 
         if (!ObjectHelper.has(document.target)) {
@@ -237,9 +266,15 @@ export class ExportService {
             throw new BadRequestError('export.target.name is empty')
         }
 
-        const target = Regex.inject(TargetService)
-        if (!await target.exists({ name: document.target.name })) {
+        const target = await Regex.inject(TargetService).get({ name: document.target.name })
+        if (!ObjectHelper.has(source)) {
             throw new BadRequestError('export.target.name is invalid or does not exists')
+        }
+
+        try {
+            await new BigQuery({ credentials: target?.credentials }).getDatasets({ maxResults: 1 })
+        } catch (error) {
+            throw new BadRequestError(`export.target.name is invalid:`, error)
         }
 
         if (ObjectHelper.has(document.settings)) {
@@ -269,7 +304,7 @@ export class ExportService {
     }
 
     public async delete({ transaction, source, target }: Pick<Export, 'transaction' | 'source' | 'target'>) {
-        
+
         if (StringHelper.empty(transaction)) {
             throw new BadRequestError(`export.transaction is empty`)
         }

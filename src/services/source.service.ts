@@ -2,10 +2,10 @@ import { CountOptions, FindOptions, MongoClient } from 'mongodb'
 import { BadRequestError } from '../exceptions/badrequest.error'
 import { MongoDBDocument, MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
-import { Regex } from '../regex'
-import { SettingsService } from './settings.service'
 import { StringHelper } from '../helpers/string.helper'
+import { Regex } from '../regex'
 import { ExportService } from './export.service'
+import { SettingsService } from './settings.service'
 
 export interface Source extends MongoDBDocument<Source, 'name'> {
     name: string
@@ -13,8 +13,15 @@ export interface Source extends MongoDBDocument<Source, 'name'> {
 }
 
 export class SourceService {
-    
+
     public static readonly COLLECTION = 'sources'
+
+    public async get({ name }: Pick<Source, 'name'>) {
+        const client = Regex.inject(MongoClient)
+        const { database } = Regex.inject(SettingsService)
+        const result = await MongoDBHelper.get<Source, 'name'>({ client, database, collection: SourceService.COLLECTION, id: { name } })
+        return result
+    }
 
     public find(filter: Partial<Source>, options?: FindOptions<Source>) {
         const client = Regex.inject(MongoClient)
@@ -72,7 +79,7 @@ export class SourceService {
     }
 
     public async delete({ name }: Pick<Source, 'name'>) {
-        
+
         if (StringHelper.empty(name)) {
             throw new BadRequestError(`source.name is empty`)
         }

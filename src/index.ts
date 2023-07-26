@@ -16,6 +16,7 @@ import { ExportService } from './services/export.service'
 import { SettingsService } from './services/settings.service'
 import { SourceService } from './services/source.service'
 import { TargetService } from './services/target.service'
+import { IngestedService } from './services/ingested.service'
 
 EnvironmentHelper.config()
 MetricHelper.config()
@@ -25,6 +26,7 @@ Regex.register(SettingsService)
 Regex.register(SourceService)
 Regex.register(TargetService)
 Regex.register(ExportService)
+Regex.register(IngestedService)
 
 Regex.controller(NotFoundController)
 Regex.controller(HealthController)
