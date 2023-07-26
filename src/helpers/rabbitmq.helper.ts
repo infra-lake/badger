@@ -128,9 +128,15 @@ export type RabbitMQQueuesInput = { logger: Logger }
 
 export class RabbitMQHelper {
 
+    public static readonly DEFAULT_RABBITMQ_CHANNEL_PREFETCH = '10'
+
     private static _connection?: IAmqpConnectionManager = undefined
     private static _producer?: ChannelWrapper = undefined
     private static readonly consumers: Array<string> = []
+
+    public static get RABBITMQ_CHANNEL_PREFETCH() {
+        return parseInt(EnvironmentHelper.get('DEFAULT_RABBITMQ_CHANNEL_PREFETCH', RabbitMQHelper.DEFAULT_RABBITMQ_CHANNEL_PREFETCH))
+    }
 
     public static get connection(): IAmqpConnectionManager | undefined {
         return RabbitMQHelper._connection
@@ -235,6 +241,8 @@ export class RabbitMQHelper {
         const wrapper = (RabbitMQHelper.connection as IAmqpConnectionManager).createChannel({
             json: false,
             setup: (channel: Channel) => {
+                
+                channel.prefetch(RabbitMQHelper.RABBITMQ_CHANNEL_PREFETCH)
 
                 const promises = []
 
@@ -262,7 +270,11 @@ export class RabbitMQHelper {
                     } catch (error) {
                         logger.error('an unexpected error occurred:', error)
                         MetricHelper.rabbitmq_received_message_total.inc({ queue, status: 'error' })
-                        channel.nack(message as ConsumeMessage)
+                        try {
+                            channel.nack(message as ConsumeMessage)    
+                        } catch (error) {
+                            logger.error('does not possible to nackmessage:', error)
+                        }
                     } finally {
                         Regex.unregister(logger)
                     }

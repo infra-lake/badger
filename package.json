@@ -1,6 +1,6 @@
 {
   "name": "badger",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Badger is a tool that export MongoDB data to Google BigQuery",
   "main": "src/index.mjs",
   "scripts": {
