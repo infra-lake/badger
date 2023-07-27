@@ -128,14 +128,12 @@ export type RabbitMQQueuesInput = { logger: Logger }
 
 export class RabbitMQHelper {
 
-    public static readonly DEFAULT_RABBITMQ_CHANNEL_PREFETCH = '10'
-
     private static _connection?: IAmqpConnectionManager = undefined
     private static _producer?: ChannelWrapper = undefined
     private static readonly consumers: Array<string> = []
 
     public static get RABBITMQ_CHANNEL_PREFETCH() {
-        return parseInt(EnvironmentHelper.get('DEFAULT_RABBITMQ_CHANNEL_PREFETCH', RabbitMQHelper.DEFAULT_RABBITMQ_CHANNEL_PREFETCH))
+        return parseInt(EnvironmentHelper.get('RABBITMQ_CHANNEL_PREFETCH', '10'))
     }
 
     public static get connection(): IAmqpConnectionManager | undefined {
