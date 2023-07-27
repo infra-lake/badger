@@ -1,13 +1,13 @@
 import { Table } from '@google-cloud/bigquery'
 import bytes from 'bytes'
 import sizeof from 'object-sizeof'
-import { EnvironmentHelper } from './environment.helper'
 import { Ingested } from '../services/ingested.service'
 
 export type ExportWorkerStatisticsRemaining = { count: number }
 export type ExportWorkerStatisticsIngested = { count: number, bytes: number, percent: number }
 export type ExportWorkerStatisticsCurrent = { count: number, bytes: number }
 export type ExportWorkerStatisticsUpdateInput = { rows: any[], ingested: Ingested }
+export type ExportStatisticsLimits = { count: number, bytes: number }
 
 export class ExportStatistics {
 
@@ -18,12 +18,13 @@ export class ExportStatistics {
 
     constructor(
         private readonly table: Table,
-        _remaining: ExportWorkerStatisticsRemaining
+        private readonly limits: ExportStatisticsLimits,
+        total: number,
+        ingested: Ingested
     ) {
-        this._remaining = _remaining
+        this._remaining = { count: total - ingested.hashs.length }
+        this._ingested = { count: ingested.hashs.length, bytes: 0, percent: (ingested.hashs.length/total) * 100 }
     }
-
-    private static get MAX_EXPORT_BYTES() { return EnvironmentHelper.get('DEFAULT_MAX_EXPORT_BYTES', '15MB') }
 
     public get broken() { return this._broken }
 
@@ -31,23 +32,23 @@ export class ExportStatistics {
 
         const __current = {
             count: rows.length,
-            bytes: rows.map(sizeof).reduce((sum, value) => sum + value, 0)
+            bytes: ExportHelper.bytes(rows)
         }
 
         const __remaining = {
             count: this._remaining.count - __current.count
         }
 
-        const count = ingested.hashs.length
+        const total = ingested.hashs.length + __remaining.count
 
         const __ingested = {
-            count,
+            count: ingested.hashs.length,
             bytes: this._ingested.bytes + __current.bytes,
-            percent: (ingested.hashs.length / (count + __remaining.count)) * 100
+            percent: (ingested.hashs.length/total) * 100
         }
 
-        // https://cloud.google.com/bigquery/quotas#streaming_inserts
-        const broken = __ingested.bytes > bytes(ExportStatistics.MAX_EXPORT_BYTES)
+        // bigquery bytes limit docs: https://cloud.google.com/bigquery/quotas#streaming_inserts
+        const broken = (__current.bytes > this.limits.bytes) || (__current.count > this.limits.bytes)
 
         return {
             current: __current,
@@ -68,6 +69,16 @@ export class ExportStatistics {
 
     public toString() {
         return `${this._current.count.toLocaleString('pt-BR')} rows (${bytes(this._current.bytes)}) to bigquery temporary table "${this.table.metadata.id}" (${this._ingested.percent.toFixed(2)}%, ${this._ingested.count.toLocaleString('pt-BR')} rows, ${bytes(this._ingested.bytes)})`
+    }
+
+}
+
+export class ExportHelper {
+
+    private constructor() { }
+
+    public static bytes(rows: any[]) {
+        return rows.map(sizeof).reduce((sum, value) => sum + value, 0)
     }
 
 }

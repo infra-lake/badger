@@ -1,18 +1,19 @@
 import { BigQuery, BigQueryTimestamp, Table } from '@google-cloud/bigquery'
 import { createHash } from 'crypto'
 import { MongoClient } from 'mongodb'
-import { ExportStatistics } from '../helpers/export.helper'
+import { ExportHelper, ExportStatistics } from '../helpers/export.helper'
 import { MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
 import { StampsHelper } from '../helpers/stamps.helper'
 import { Regex, TransactionalContext, Worker } from '../regex'
-import { Export, ExportService } from '../services/export.service'
+import { Export, ExportService, ExportServiceLimits } from '../services/export.service'
 import { Ingested, IngestedService } from '../services/ingested.service'
 import { Source, SourceService } from '../services/source.service'
 
 type ExportWorkerSource = { client: MongoClient, database: string, collection: string, filter: any }
 type ExportWorkerTarget = { client: BigQuery, dataset: string, table: { main: Table, temporary: Table } }
 type ExportWorkerInsertInput = { table: Table, rows: any[], ingested: Ingested }
+type ExportWorkerFlushInput = { remaining: number, rows: any[] }
 
 export class ExportWorker extends Worker {
 
@@ -35,8 +36,20 @@ export class ExportWorker extends Worker {
     protected get logger() { return this.context.logger }
     protected get attempts() { return this.input.settings.attempts }
     private get stamps() { return this.input.settings.stamps }
-    private get limit() { return this.input.settings.limit }
     private get window() { return this.input.window }
+
+    private get limits(): ExportServiceLimits {
+
+        const service = Regex.inject(ExportService)
+        const { count, bytes } = service.limits()
+
+        if (this.input.settings.limit > count) {
+            return { count, bytes }
+        }
+
+        return { count: this.input.settings.limit, bytes }
+
+    }
 
     protected async perform() {
 
@@ -52,11 +65,17 @@ export class ExportWorker extends Worker {
             target = await this.target()
 
             let count = await MongoDBHelper.count(source)
+
+            if(count <= 0) {
+                this.logger.log('there aren\'t rows to export')
+                return
+            }
+
             this.logger.log(`exporting ${count.toLocaleString('pt-BR')} row(s)...`)
 
             const ingested = await this.ingested()
 
-            this.statistics = new ExportStatistics(target.table.temporary, { count: count - ingested.hashs.length })
+            this.statistics = new ExportStatistics(target.table.temporary, this.limits, count, ingested)
 
             let rows: any[] = []
 
@@ -72,9 +91,7 @@ export class ExportWorker extends Worker {
                     ingested.hashs.push(row.hash)
                 }
 
-                const flush = ((--count % this.limit) === 0 || count <= 0) && rows.length > 0
-
-                if (flush) {
+                if (this.flush({ remaining: --count, rows })) {
                     rows = await this.insert({ table: target.table.temporary, rows, ingested })
                 }
 
@@ -90,60 +107,6 @@ export class ExportWorker extends Worker {
             throw error
 
         }
-
-    }
-
-    private async insert({ table, rows, ingested }: ExportWorkerInsertInput) {
-
-        const { hashs } = ingested
-
-        const included = { rows, hashs }
-        const excluded = { rows: [] as any[], hashs: [] as string[] }
-
-        while (this.statistics?.simulate({ rows: included.rows, ingested }).broken) {
-            excluded.rows.push(included.rows.pop())
-            excluded.hashs.push(included.hashs.pop() as string)
-        }
-
-        await table.insert(included.rows)
-
-        const service = Regex.inject(IngestedService)
-        ingested.hashs = included.hashs
-        await service.save(ingested)
-
-        ingested.hashs.push(...excluded.hashs)
-
-        this.statistics?.update({ rows: included.rows, ingested })
-        this.logger.log(`flushing ${this.statistics}...`)
-
-        return excluded.rows
-
-    }
-
-    private async ingested() {
-
-        const service = Regex.inject(IngestedService)
-
-        const { transaction, source, target } = this.input
-
-        const cursor = service.find({ transaction, source, target })
-
-        let ingested = null
-
-        if (await cursor.hasNext()) {
-            ingested = await cursor.next()
-        }
-
-        if (!ObjectHelper.has(ingested)) {
-            ingested = { transaction, source, target, hashs: [] }
-            await service.save(ingested)
-        }
-
-        if ((ingested?.hashs.length ?? 0) > 0) {
-            this.logger.log(`${ingested?.hashs.length.toLocaleString('pt-BR')} row(s) already ingested...`)
-        }
-
-        return ingested as Ingested
 
     }
 
@@ -179,6 +142,64 @@ export class ExportWorker extends Worker {
         const temporary = await service.table({ client, transaction, source, prefix, type: 'temporary', create: true }) as Table
 
         return { client, dataset, table: { main, temporary } }
+
+    }
+
+    private async ingested() {
+
+        const service = Regex.inject(IngestedService)
+
+        const { transaction, source, target } = this.input
+
+        const cursor = service.find({ transaction, source, target })
+
+        let ingested = null
+
+        if (await cursor.hasNext()) {
+            ingested = await cursor.next()
+        }
+
+        if (!ObjectHelper.has(ingested)) {
+            ingested = { transaction, source, target, hashs: [] }
+            await service.save(ingested)
+        }
+
+        if ((ingested?.hashs.length ?? 0) > 0) {
+            this.logger.log(`${ingested?.hashs.length.toLocaleString('pt-BR')} row(s) already ingested...`)
+        }
+
+        return ingested as Ingested
+
+    }
+
+    private flush({ remaining: total, rows }: ExportWorkerFlushInput) {
+        return rows.length > 0 && (total <= 0 || (total % this.limits.count) === 0 || ExportHelper.bytes(rows) > this.limits.bytes)
+    }
+
+    private async insert({ table, rows, ingested }: ExportWorkerInsertInput) {
+
+        const { hashs } = ingested
+
+        const included = { rows, hashs }
+        const excluded = { rows: [] as any[], hashs: [] as string[] }
+
+        while (this.statistics?.simulate({ rows: included.rows, ingested }).broken) {
+            excluded.rows.push(included.rows.pop())
+            excluded.hashs.push(included.hashs.pop() as string)
+        }
+
+        await table.insert(included.rows)
+
+        const service = Regex.inject(IngestedService)
+        ingested.hashs = included.hashs
+        await service.save(ingested)
+
+        ingested.hashs.push(...excluded.hashs)
+
+        this.statistics?.update({ rows: included.rows, ingested })
+        this.logger.log(`flushing ${this.statistics}...`)
+
+        return excluded.rows
 
     }
 

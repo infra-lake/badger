@@ -1,4 +1,3 @@
-import { ObjectHelper } from '../helpers/object.helper'
 import { RabbitMQIncomingMessage } from '../helpers/rabbitmq.helper'
 import { Regex } from '../regex'
 import { MessageControl, RegexRabbitMQController, RegexRabbitMQControllerConfig } from '../regex/rabbitmq'
@@ -14,11 +13,11 @@ export class ExportWorkerController implements RegexRabbitMQController {
 
     public async handle(queue: string, message: RabbitMQIncomingMessage, control: MessageControl) {
 
-        
+
         const [_, _source, database, collection, _target] = queue.split(':')
         const source: ExportSource = { name: _source, database, collection }
         const target: ExportTarget = { name: _target }
-        
+
         const { transaction } = message.json<{ transaction: string }>()
 
         const id = { transaction, source, target }

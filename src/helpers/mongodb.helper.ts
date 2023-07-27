@@ -1,9 +1,6 @@
-import { AggregateOptions, CountOptions, Document, Filter, FindCursor, FindOptions, MongoClient, WithId } from 'mongodb'
-import Stream from 'stream'
-import { ObjectHelper } from './object.helper'
-import { Stamps } from './stamps.helper'
-import { Window } from './window.helper'
+import { CountOptions, Document, Filter, FindOptions, MongoClient } from 'mongodb'
 import { ApplicationHelper } from './application.helper'
+import { ObjectHelper } from './object.helper'
 
 export interface MongoDBDocument<T extends MongoDBDocument<T, K>, K extends keyof T> {
 
@@ -20,7 +17,7 @@ export type LastInput = { client: MongoClient, database: string, collection: str
 export type DeleteInput<T extends MongoDBDocument<T, K>, K extends keyof T> = { client: MongoClient, database: string, collection: string; id: Pick<T, K> }
 
 export class MongoDBHelper {
-    
+
     private constructor() { }
 
     public static async databases({ client }: DatabasesInput) {
@@ -30,7 +27,7 @@ export class MongoDBHelper {
 
     public static async collections({ client, database }: CollectionsInput) {
         const result = await client.db(database).collections()
-        return result.filter(({ collectionName }) => !ApplicationHelper.REMOVE.COLLECTIONS.includes(collectionName))
+        return result.filter(({ collectionName }) => !ApplicationHelper.IGNORE.COLLECTIONS.includes(collectionName))
     }
 
     public static find<T extends Document = Document>({ client, database, collection, filter, options }: FindInput<T>) {

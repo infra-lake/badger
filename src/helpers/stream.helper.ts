@@ -1,4 +1,3 @@
-import { FindCursor } from 'mongodb'
 import Stream from 'stream'
 import { ObjectHelper } from './object.helper'
 

@@ -1,4 +1,5 @@
 import { BigQuery } from '@google-cloud/bigquery'
+import bytes from 'bytes'
 import { CountOptions, Document, Filter, FindOptions, MongoClient } from 'mongodb'
 import { BadRequestError } from '../exceptions/badrequest.error'
 import { BigQueryHelper } from '../helpers/bigquery.helper'
@@ -47,13 +48,42 @@ export type Export4Update = Pick<Export, 'status' | 'error'>
 export type ExportServiceCleanupInput = Pick<Export, 'target'> & { logger: Logger }
 export type ExportServiceDatasetInput = Pick<ExportSource, 'database'> & { prefix: string }
 export type ExportServiceTableInput = { client: BigQuery, transaction: Export['transaction'], source: Pick<ExportSource, 'database' | 'collection'>, prefix: string, type: 'main' | 'temporary', create: boolean }
+export type ExportServiceSettings = Pick<ExportSettings, 'attempts'| 'limit'>
+export type ExportServiceLimits = { count: number, bytes: number }
 
 export class ExportService {
 
     public static readonly COLLECTION = 'exports'
 
-    public static get EXPORT_ATTEMPS() { return parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_ATTEMPS', '3')) }
-    public static get EXPORT_LIMIT() { return parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_LIMIT', '1000')) }
+    private _settings?: ExportServiceSettings
+    public settings(input?: Export4Create) {
+
+        if (!ObjectHelper.has(this._settings)) {
+            const attempts = parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_SETTING_ATTEMPS', '3'))
+            const limit = parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_SETTING_LIMIT', '1000'))
+            this._settings = { attempts, limit }
+        }
+        
+        const attempts = input?.settings?.attempts ?? this._settings?.attempts as number
+        const limit = input?.settings?.limit ?? this._settings?.limit as number
+
+        const stamps = StampsHelper.extract(input?.settings, 'stamps')
+        
+        const result: ExportSettings = { attempts, limit, stamps }
+        
+        return result
+
+    }
+
+    private _limits?: ExportServiceLimits
+    public limits() {
+        if (!ObjectHelper.has(this._limits)) {
+            const count = parseInt(EnvironmentHelper.get('EXPORT_LIMIT_COUNT', '500'))
+            const _bytes = bytes(EnvironmentHelper.get('EXPORT_LIMIT_BYTES', '15MB'))
+            this._limits = { count, bytes: _bytes }
+        }
+        return this._limits as ExportServiceLimits
+    }
 
     public find(filter: Filter<Export>, options?: FindOptions<Export>) {
         const client = Regex.inject(MongoClient)
@@ -92,13 +122,9 @@ export class ExportService {
 
         await this.validate(input);
 
-        input.settings = input.settings ?? {}
-        input.settings.attempts = input.settings?.attempts ?? ExportService.EXPORT_ATTEMPS
-        input.settings.limit = input.settings?.limit ?? ExportService.EXPORT_LIMIT
-        input.settings.stamps = StampsHelper.extract(input.settings, 'stamps')
-        input.window = input?.window ?? {}
-        input.window.begin = input.window?.begin ?? await this.last(input)
-        input.window.end = input.window?.end ?? new Date();
+        input.settings = this.settings(input)
+        input.window = await this.window(input);
+
         (input as Export).status = 'pending'
 
         const client = Regex.inject(MongoClient)
@@ -133,10 +159,16 @@ export class ExportService {
 
     }
 
+    private async window(input: Export4Create) {
+        const begin = input.window?.begin ?? await this.last(input)
+        const end = input.window?.end ?? new Date();
+        return { begin, end }
+    }
+
     public async update(context: TransactionalContext, { transaction, source, target }: Pick<Export, 'transaction' | 'source' | 'target'>, { status, error }: Export4Update) {
 
         const { logger } = context
-        
+
         const document = await this.get({ transaction, source, target }) as Export
 
         document.status = status
@@ -282,6 +314,11 @@ export class ExportService {
         }
 
         if (ObjectHelper.has(document.settings)) {
+
+            const _limits = this.limits()
+            if (ObjectHelper.has(document.settings.limit) && document.settings.limit > _limits.count) {
+                throw new BadRequestError('export.settings.limit must not be more than', _limits.count)
+            }
 
             if (ObjectHelper.has(document.settings.attempts) && document.settings.attempts < 0) {
                 throw new BadRequestError('export.settings.attempts is invalid')

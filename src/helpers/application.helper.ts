@@ -4,16 +4,16 @@ import { EnvironmentHelper } from './environment.helper'
 export class ApplicationHelper {
 
     private static readonly DEFAULT_PORT = '4000'
-    private static readonly DEFAULT_REMOVE_COLLECTIONS = ''
+    private static readonly DEFAULT_IGNORE_COLLECTIONS = ''
     
     public static get PORT(): number {
         return parseInt(EnvironmentHelper.get('PORT', ApplicationHelper.DEFAULT_PORT))
     }
 
-    public static get REMOVE() {
+    public static get IGNORE() {
         
         const COLLECTIONS = 
-            EnvironmentHelper.get('REMOVE_COLLECTIONS', ApplicationHelper.DEFAULT_REMOVE_COLLECTIONS)
+            EnvironmentHelper.get('IGNORE_COLLECTIONS', ApplicationHelper.DEFAULT_IGNORE_COLLECTIONS)
                 .trim()
                 .split(',')
                 .map(stream => stream.trim())
