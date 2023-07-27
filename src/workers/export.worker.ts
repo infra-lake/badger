@@ -1,18 +1,26 @@
 import { BigQuery, BigQueryTimestamp, Table } from '@google-cloud/bigquery'
 import { createHash } from 'crypto'
-import { MongoClient } from 'mongodb'
+import { AggregateOptions, AggregationCursor, MongoClient } from 'mongodb'
 import { ExportHelper, ExportStatistics } from '../helpers/export.helper'
 import { MongoDBHelper } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
 import { StampsHelper } from '../helpers/stamps.helper'
+import { Window } from '../helpers/window.helper'
 import { Regex, TransactionalContext, Worker } from '../regex'
 import { Export, ExportService, ExportServiceLimits } from '../services/export.service'
-import { Ingested, IngestedService } from '../services/ingested.service'
+import { Temp, TempService } from '../services/temp.service'
 import { Source, SourceService } from '../services/source.service'
 
-type ExportWorkerSource = { client: MongoClient, database: string, collection: string, filter: any }
+interface ExportWorkerSource {
+    client: MongoClient
+    database: string
+    collection: string
+    filter: any
+    count: () => Promise<number>
+    find: () => AggregationCursor<Source>
+}
 type ExportWorkerTarget = { client: BigQuery, dataset: string, table: { main: Table, temporary: Table } }
-type ExportWorkerInsertInput = { table: Table, rows: any[], ingested: Ingested }
+type ExportWorkerInsertInput = { table: Table, rows: any[] }
 type ExportWorkerFlushInput = { remaining: number, rows: any[] }
 
 export class ExportWorker extends Worker {
@@ -21,7 +29,8 @@ export class ExportWorker extends Worker {
 
     public constructor(
         private readonly _context: TransactionalContext,
-        private readonly _input: Export
+        private readonly _input: Export,
+        private readonly _temp: Temp
     ) { super() }
 
     public get name(): string {
@@ -33,10 +42,24 @@ export class ExportWorker extends Worker {
 
     public get context() { return this._context }
     public get input() { return this._input }
+    private get temp() { return this._temp }
+
     protected get logger() { return this.context.logger }
     protected get attempts() { return this.input.settings.attempts }
     private get stamps() { return this.input.settings.stamps }
-    private get window() { return this.input.window }
+
+    private get window(): Window {
+
+        if (this.temp.date.getTime() > this.input.window.begin.getTime()) {
+            return {
+                begin: this.temp.date,
+                end: this.window.end
+            }
+        }
+
+        return this.input.window
+
+    }
 
     private get limits(): ExportServiceLimits {
 
@@ -64,35 +87,24 @@ export class ExportWorker extends Worker {
             source = await this.source()
             target = await this.target()
 
-            let count = await MongoDBHelper.count(source)
+            let count = await source.count()
+            if (count <= 0) { return }
 
-            if(count <= 0) {
-                this.logger.log('there aren\'t rows to export')
-                return
-            }
-
-            this.logger.log(`exporting ${count.toLocaleString('pt-BR')} row(s)...`)
-
-            const ingested = await this.ingested()
-
-            this.statistics = new ExportStatistics(target.table.temporary, this.limits, count, ingested)
+            this.statistics = new ExportStatistics(target.table.temporary, this.limits, count, this.temp)
 
             let rows: any[] = []
 
-            const cursor = MongoDBHelper.find(source)
+            const cursor = source.find()
             while (await cursor.hasNext()) {
 
                 const document = await cursor.next()
 
                 const row = this.row(document, now)
 
-                if (!ingested.hashs.includes(row.hash)) {
-                    rows.push(row)
-                    ingested.hashs.push(row.hash)
-                }
+                rows.push(row)
 
                 if (this.flush({ remaining: --count, rows })) {
-                    rows = await this.insert({ table: target.table.temporary, rows, ingested })
+                    rows = await this.insert({ table: target.table.temporary, rows })
                 }
 
             }
@@ -122,7 +134,32 @@ export class ExportWorker extends Worker {
 
         const filter = ExportService.filter(this.stamps, this.window)
 
-        return { client, database, collection, filter }
+        const count = async () => {
+
+            const count = await MongoDBHelper.count({ client, database, collection, filter })
+
+            if (count <= 0) {
+                this.logger.log('there aren\'t rows to export')
+            } else {
+                this.logger.log(`exporting ${count.toLocaleString('pt-BR')} row(s)...`)
+            }
+
+            return count
+        }
+
+        const find = () => {
+            const options: AggregateOptions = { allowDiskUse: true }
+            return client.db(database).collection(collection).aggregate<Source>([
+                { $addFields: { temporary: 1, [this.stamps.update]: filter['$expr']['$and'][0]['$gt'][0] } },
+                { $addFields: { match: filter['$expr'] } },
+                { $project: { temporary: 0 } },
+                { $match: { match: true } },
+                { $project: { match: 0 } },
+                { $sort: { [this.stamps.update]: 1 } }
+            ], options)
+        }
+
+        return { client, database, collection, filter, count, find }
 
     }
 
@@ -145,61 +182,35 @@ export class ExportWorker extends Worker {
 
     }
 
-    private async ingested() {
-
-        const service = Regex.inject(IngestedService)
-
-        const { transaction, source, target } = this.input
-
-        const cursor = service.find({ transaction, source, target })
-
-        let ingested = null
-
-        if (await cursor.hasNext()) {
-            ingested = await cursor.next()
-        }
-
-        if (!ObjectHelper.has(ingested)) {
-            ingested = { transaction, source, target, hashs: [] }
-            await service.save(ingested)
-        }
-
-        if ((ingested?.hashs.length ?? 0) > 0) {
-            this.logger.log(`${ingested?.hashs.length.toLocaleString('pt-BR')} row(s) already ingested...`)
-        }
-
-        return ingested as Ingested
-
-    }
-
     private flush({ remaining: total, rows }: ExportWorkerFlushInput) {
         return rows.length > 0 && (total <= 0 || (total % this.limits.count) === 0 || ExportHelper.bytes(rows) > this.limits.bytes)
     }
 
-    private async insert({ table, rows, ingested }: ExportWorkerInsertInput) {
+    private async insert({ table, rows }: ExportWorkerInsertInput) {
 
-        const { hashs } = ingested
+        const { count } = this.temp
+        const included = rows
+        const excluded = [] as ExportWorkerInsertInput['rows']
 
-        const included = { rows, hashs }
-        const excluded = { rows: [] as any[], hashs: [] as string[] }
-
-        while (this.statistics?.simulate({ rows: included.rows, ingested }).broken) {
-            excluded.rows.push(included.rows.pop())
-            excluded.hashs.push(included.hashs.pop() as string)
+        while (this.statistics?.simulate({ rows: included, temp: { count } }).broken) {
+            excluded.push(included.pop())
         }
 
-        await table.insert(included.rows)
+        const date = included[included.length - 1][this.stamps.update]
+        included.forEach(row => delete row[this.stamps.update])
 
-        const service = Regex.inject(IngestedService)
-        ingested.hashs = included.hashs
-        await service.save(ingested)
+        await table.insert(included)
 
-        ingested.hashs.push(...excluded.hashs)
+        this.temp.count += included.length
+        this.temp.date = date
+        
+        const service = Regex.inject(TempService)
+        await service.save(this.temp)
 
-        this.statistics?.update({ rows: included.rows, ingested })
+        this.statistics?.update({ rows: included, temp: this.temp })
         this.logger.log(`flushing ${this.statistics}...`)
 
-        return excluded.rows
+        return excluded
 
     }
 
@@ -210,6 +221,7 @@ export class ExportWorker extends Worker {
         return {
             [StampsHelper.DEFAULT_STAMP_ID]: chunk[this.stamps.id].toString(),
             [StampsHelper.DEFAULT_STAMP_INSERT]: new BigQueryTimestamp(date),
+            [this.stamps.update]: chunk[this.stamps.update],
             data,
             hash: createHash('md5').update(data).digest('hex')
         }

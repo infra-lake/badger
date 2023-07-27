@@ -4,7 +4,7 @@ import { Regex } from '../regex'
 import { SourceService } from './source.service'
 import { TargetService } from './target.service'
 import { ExportService } from './export.service'
-import { IngestedService } from './ingested.service'
+import { TempService } from './temp.service'
 
 export class SettingsService {
 
@@ -19,7 +19,7 @@ export class SettingsService {
         const source = SourceService.COLLECTION
         const target = TargetService.COLLECTION
         const _export = ExportService.COLLECTION
-        const ingested = IngestedService.COLLECTION
+        const temp = TempService.COLLECTION
         
         if (collections.filter(({ collectionName }) => collectionName === source).length <= 0) {
             await mongodb.db(this.database).createCollection(source)
@@ -33,8 +33,8 @@ export class SettingsService {
             await mongodb.db(this.database).createCollection(_export)
         }
 
-        if (collections.filter(({ collectionName }) => collectionName === ingested).length <= 0) {
-            await mongodb.db(this.database).createCollection(ingested)
+        if (collections.filter(({ collectionName }) => collectionName === temp).length <= 0) {
+            await mongodb.db(this.database).createCollection(temp)
         }
 
     }

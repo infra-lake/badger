@@ -1,12 +1,12 @@
 import { Table } from '@google-cloud/bigquery'
 import bytes from 'bytes'
 import sizeof from 'object-sizeof'
-import { Ingested } from '../services/ingested.service'
+import { Temp } from '../services/temp.service'
 
 export type ExportWorkerStatisticsRemaining = { count: number }
 export type ExportWorkerStatisticsIngested = { count: number, bytes: number, percent: number }
 export type ExportWorkerStatisticsCurrent = { count: number, bytes: number }
-export type ExportWorkerStatisticsUpdateInput = { rows: any[], ingested: Ingested }
+export type ExportWorkerStatisticsUpdateInput = { rows: any[], temp: Pick<Temp, 'count'> }
 export type ExportStatisticsLimits = { count: number, bytes: number }
 
 export class ExportStatistics {
@@ -20,15 +20,15 @@ export class ExportStatistics {
         private readonly table: Table,
         private readonly limits: ExportStatisticsLimits,
         total: number,
-        ingested: Ingested
+        temp: Temp
     ) {
-        this._remaining = { count: total - ingested.hashs.length }
-        this._ingested = { count: ingested.hashs.length, bytes: 0, percent: (ingested.hashs.length/total) * 100 }
+        this._remaining = { count: total - temp.count }
+        this._ingested = { count: temp.count, bytes: 0, percent: (temp.count/total) * 100 }
     }
 
     public get broken() { return this._broken }
 
-    public simulate({ rows, ingested }: ExportWorkerStatisticsUpdateInput) {
+    public simulate({ rows, temp }: ExportWorkerStatisticsUpdateInput) {
 
         const __current = {
             count: rows.length,
@@ -39,12 +39,12 @@ export class ExportStatistics {
             count: this._remaining.count - __current.count
         }
 
-        const total = ingested.hashs.length + __remaining.count
+        const total = temp.count + __remaining.count
 
         const __ingested = {
-            count: ingested.hashs.length,
+            count: temp.count,
             bytes: this._ingested.bytes + __current.bytes,
-            percent: (ingested.hashs.length/total) * 100
+            percent: (temp.count/total) * 100
         }
 
         // bigquery bytes limit docs: https://cloud.google.com/bigquery/quotas#streaming_inserts

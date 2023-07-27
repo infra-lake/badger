@@ -1,4 +1,4 @@
-import { BigQuery } from '@google-cloud/bigquery'
+import { BigQuery, Table } from '@google-cloud/bigquery'
 import bytes from 'bytes'
 import { CountOptions, Document, Filter, FindOptions, MongoClient } from 'mongodb'
 import { BadRequestError } from '../exceptions/badrequest.error'
@@ -11,10 +11,11 @@ import { Stamps, StampsHelper } from '../helpers/stamps.helper'
 import { StringHelper } from '../helpers/string.helper'
 import { Window } from '../helpers/window.helper'
 import { Logger, Regex, TransactionalContext } from '../regex'
-import { Ingested, IngestedService } from './ingested.service'
+import { ExportWorker } from '../workers/export.worker'
 import { SettingsService } from './settings.service'
 import { Source, SourceService } from './source.service'
 import { Target, TargetService } from './target.service'
+import { Temp, TempService } from './temp.service'
 
 export interface ExportSource {
     name: Source['name']
@@ -48,7 +49,7 @@ export type Export4Update = Pick<Export, 'status' | 'error'>
 export type ExportServiceCleanupInput = Pick<Export, 'target'> & { logger: Logger }
 export type ExportServiceDatasetInput = Pick<ExportSource, 'database'> & { prefix: string }
 export type ExportServiceTableInput = { client: BigQuery, transaction: Export['transaction'], source: Pick<ExportSource, 'database' | 'collection'>, prefix: string, type: 'main' | 'temporary', create: boolean }
-export type ExportServiceSettings = Pick<ExportSettings, 'attempts'| 'limit'>
+export type ExportServiceSettings = Pick<ExportSettings, 'attempts' | 'limit'>
 export type ExportServiceLimits = { count: number, bytes: number }
 
 export class ExportService {
@@ -63,14 +64,14 @@ export class ExportService {
             const limit = parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_SETTING_LIMIT', '1000'))
             this._settings = { attempts, limit }
         }
-        
+
         const attempts = input?.settings?.attempts ?? this._settings?.attempts as number
         const limit = input?.settings?.limit ?? this._settings?.limit as number
 
         const stamps = StampsHelper.extract(input?.settings, 'stamps')
-        
+
         const result: ExportSettings = { attempts, limit, stamps }
-        
+
         return result
 
     }
@@ -418,12 +419,48 @@ export class ExportService {
 
     private async cleanup({ logger, target: _target }: ExportServiceCleanupInput) {
 
+        logger.log('starting cleanup...')
+
         const _export = Regex.inject(ExportService)
-        const ingested = Regex.inject(IngestedService)
+        const temp = Regex.inject(TempService)
 
         const _client = await this.bigquery(_target)
 
         const prefixes = [StampsHelper.DEFAULT_STAMP_DATASET_NAME_PREFIX]
+
+        logger.log('removing orphan tables...')
+
+        const temps = temp.find({}, { projection: { transaction: 1, source: 1, target: 1 } })
+        while (await temps.hasNext()) {
+
+            const { transaction, source, target } = await temps.next() as Temp
+            const id = { transaction, source, target }
+            const database = source.database
+
+            await Promise.all(prefixes.map(async (prefix) => {
+
+                const dataset = this.dataset({ prefix, database })
+
+                if (!await _export.exists(id)) {
+
+                    try {
+
+                        await temp.delete(id)
+
+                        const temporary = await this.table({ client: _client, transaction, source, prefix, type: 'temporary', create: false })
+                        await temporary?.delete({ ignoreNotFound: true })
+
+                    } catch (error) {
+                        logger.error(`does not possible delete temporary orphan bigquery table "${dataset}":`, error)
+                    }
+
+                }
+
+            }))
+
+        }
+
+        logger.log('removing temporary tables and collections...')
 
         const exports = _export.find({ status: 'success' })
         while (await exports.hasNext()) {
@@ -439,11 +476,11 @@ export class ExportService {
 
             const id = { transaction, source, target }
 
-            if (await ingested.exists(id)) {
+            if (await temp.exists(id)) {
 
                 try {
 
-                    await ingested.delete(id)
+                    await temp.delete(id)
 
                 } catch (error) {
                     logger.error(`does not possible delete temp collection for export (transaction: "${transaction}", source: ${JSON.stringify(source)} , target: ${JSON.stringify(target)}):`, error)
@@ -451,7 +488,7 @@ export class ExportService {
 
             }
 
-            const dataset = this.dataset({ prefix, database })
+            const _dataset = this.dataset({ prefix, database })
 
             try {
 
@@ -460,44 +497,110 @@ export class ExportService {
                         ? _client
                         : await this.bigquery(target)
 
-                const temporary = await this.table({ client, transaction, source, prefix, type: 'temporary', create: false })
-                await temporary?.delete({ ignoreNotFound: true })
+                const __dataset = await BigQueryHelper.dataset({ client, name: _dataset, create: false })
 
-            } catch (error) {
-                logger.error(`does not possible delete temporary bigquery table "${dataset}" for export (transaction: "${transaction}", source: ${JSON.stringify(source)} , target: ${JSON.stringify(target)}):`, error)
-            }
+                const cursor = await __dataset?.getTables()
 
-        }
+                const tables = cursor?.[0]
 
-        const ingests = ingested.find({}, { projection: { transaction: 1, source: 1, target: 1 } })
-        while (await ingests.hasNext()) {
+                if (ObjectHelper.has(tables)) {
 
-            const { transaction, source, target } = await ingests.next() as Ingested
-            const id = { transaction, source, target }
-            const database = source.database
+                    for (const table of (tables as Table[])) {
 
-            await Promise.all(prefixes.map(async (prefix) => {
+                        if (table.id?.endsWith('_temp')) {
 
-                const dataset = this.dataset({ prefix, database })
+                            const split = table.id.replace(/_temp$/g, '').split('_')
+                            const transaction = `${split[split.length - 4]}-${split[split.length - 3]}-${split[split.length - 2]}-${split[split.length - 1]}`
 
-                if (!await _export.exists(id)) {
+                            if (!await temp.exists({ transaction })) {
 
-                    try {
+                                await table?.delete({ ignoreNotFound: true })
 
-                        await ingested.delete(id)
+                            }
 
-                        const temporary = await this.table({ client: _client, transaction, source, prefix, type: 'temporary', create: false })
-                        await temporary?.delete({ ignoreNotFound: true })
+                        }
 
-                    } catch (error) {
-                        logger.error(`does not possible delete temporary orphan bigquery table "${dataset}":`, error)
                     }
 
                 }
 
-            }))
+            } catch (error) {
+                logger.error(`does not possible delete temporary bigquery table "${_dataset}" for export (transaction: "${transaction}", source: ${JSON.stringify(source)} , target: ${JSON.stringify(target)}):`, error)
+            }
 
         }
+
+        logger.log('cleanup finished successfully')
+
+    }
+
+    public async process(context: TransactionalContext, queue: string, transaction: string) {
+
+        const [_, _source, database, collection, _target] = queue.split(':')
+        const source: ExportSource = { name: _source, database, collection }
+        const target: ExportTarget = { name: _target }
+
+        const id = { transaction, source, target }
+
+        context.logger.log('new event received:', id)
+
+        try {
+
+            const data = await this.get(id) as Export
+
+            const _temp = await this.temp(context, data)
+
+            const worker = new ExportWorker(context, data, _temp)
+
+            await worker.run()
+
+            await this.update(context, id, { status: 'success' })
+
+        } catch (error: any) {
+
+            const _message = 'fail on worker export'
+
+            context.logger.error(_message, error)
+
+            await this.update(
+                context,
+                id,
+                {
+                    status: 'error',
+                    error: {
+                        message: 'message' in error ? error.message : _message,
+                        cause: 'cause' in error ? error.cause : error
+                    }
+                }
+            )
+
+        }
+    }
+
+    private async temp(context: TransactionalContext, data: Export) {
+
+        const service = Regex.inject(TempService)
+
+        const { transaction, source, target, window } = data
+
+        const cursor = service.find({ transaction, source, target })
+
+        let temp = null
+
+        if (await cursor.hasNext()) {
+            temp = await cursor.next()
+        }
+
+        if (!ObjectHelper.has(temp)) {
+            temp = { transaction, source, target, date: window.begin, count: 0 }
+            await service.save(temp)
+        }
+
+        if ((temp?.date ?? new Date(0)).getTime() > window.begin.getTime() || (temp?.count ?? 0) > 0) {
+            context.logger.log(`${temp?.count.toLocaleString('pt-BR')} rows already inserted, resuming data ingestion from date ${temp?.date.toLocaleDateString('pt-BR')}...`)
+        }
+
+        return temp as Temp
 
     }
 

@@ -15,6 +15,8 @@ export abstract class Worker {
 
     public async run() {
 
+        this.logger.log(`starting worker "${this.name}"...`)
+
         let attempt = -1
         let tryAgain = false
         const errors: Error[] = []
@@ -28,6 +30,8 @@ export abstract class Worker {
                 await this.perform(attempt, errors[errors.length - 1])
 
                 tryAgain = false
+
+                this.logger.log(`worker "${this.name}" finished successfully`)
 
             } catch (error) {
 

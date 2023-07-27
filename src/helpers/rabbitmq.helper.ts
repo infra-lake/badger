@@ -271,7 +271,7 @@ export class RabbitMQHelper {
                         try {
                             channel.nack(message as ConsumeMessage)    
                         } catch (error) {
-                            logger.error('does not possible to nackmessage:', error)
+                            logger.warn('does not possible to nackmessage:', error)
                         }
                     } finally {
                         Regex.unregister(logger)

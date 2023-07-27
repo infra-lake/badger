@@ -7,32 +7,33 @@ import { Regex } from '../regex'
 import { ExportSource, ExportTarget } from './export.service'
 import { SettingsService } from './settings.service'
 
-export interface Ingested extends MongoDBDocument<Ingested, 'transaction' | 'source' | 'target'> {
+export interface Temp extends MongoDBDocument<Temp, 'transaction' | 'source' | 'target'> {
     transaction: string,
     source: ExportSource,
     target: ExportTarget,
-    hashs: Array<string>
+    date: Date,
+    count: number
 }
 
-export class IngestedService {
+export class TempService {
 
-    public static readonly COLLECTION = 'ingesteds'
+    public static readonly COLLECTION = 'temps'
 
-    public find(filter?: Filter<Ingested>, options?: FindOptions<Ingested>) {
+    public find(filter?: Filter<Temp>, options?: FindOptions<Temp>) {
         const client = Regex.inject(MongoClient)
         const { database } = Regex.inject(SettingsService)
-        const result = MongoDBHelper.find({ client, database, collection: IngestedService.COLLECTION, filter, options })
+        const result = MongoDBHelper.find({ client, database, collection: TempService.COLLECTION, filter, options })
         return result
     }
 
-    public async exists(filter: Partial<Ingested>, options?: CountOptions) {
+    public async exists(filter: Partial<Temp>, options?: CountOptions) {
         const client = Regex.inject(MongoClient)
         const { database } = Regex.inject(SettingsService)
-        const result = MongoDBHelper.exists({ client, database, collection: IngestedService.COLLECTION, filter, options })
+        const result = MongoDBHelper.exists({ client, database, collection: TempService.COLLECTION, filter, options })
         return result
     }
 
-    public async save(document: Ingested) {
+    public async save(document: Temp) {
 
         await this.validate(document)
 
@@ -40,45 +41,45 @@ export class IngestedService {
         const { database } = Regex.inject(SettingsService)
         const id = { transaction: document.transaction, source: document.source, target: document.target }
 
-        await MongoDBHelper.save({ client, database, collection: IngestedService.COLLECTION, id, document })
+        await MongoDBHelper.save({ client, database, collection: TempService.COLLECTION, id, document })
 
     }
 
-    public async validate(entity: Ingested) {
+    public async validate(entity: Temp) {
 
         if (!ObjectHelper.has(entity)) {
-            throw new BadRequestError('ingested is empty')
+            throw new BadRequestError('temp is empty')
         }
 
         if (StringHelper.empty(entity.transaction)) {
-            throw new BadRequestError('ingested.transaction is empty')
+            throw new BadRequestError('temp.transaction is empty')
         }
 
         if (!ObjectHelper.has(entity.source)) {
-            throw new BadRequestError('ingested.source is empty')
+            throw new BadRequestError('temp.source is empty')
         }
 
         if (StringHelper.empty(entity.source.name)) {
-            throw new BadRequestError('ingested.source.name is empty')
+            throw new BadRequestError('temp.source.name is empty')
         }
 
         if (StringHelper.empty(entity.source.database)) {
-            throw new BadRequestError('ingested.source.database is empty')
+            throw new BadRequestError('temp.source.database is empty')
         }
 
         if (StringHelper.empty(entity.source.collection)) {
-            throw new BadRequestError('ingested.source.collection is empty')
+            throw new BadRequestError('temp.source.collection is empty')
         }
 
         if (StringHelper.empty(entity.target.name)) {
-            throw new BadRequestError('ingested.target.name is empty')
+            throw new BadRequestError('temp.target.name is empty')
         }
 
     }
 
-    public async delete(document: Omit<Ingested, 'hashs'>) {
+    public async delete(document: Omit<Temp, 'date' | 'count'>) {
 
-        this.validate(document as Ingested)
+        this.validate(document as Temp)
 
         const { transaction, source, target } = document
 
@@ -87,7 +88,7 @@ export class IngestedService {
 
 
         const id = { transaction, source, target }
-        await MongoDBHelper.delete({ client, database, collection: IngestedService.COLLECTION, id })
+        await MongoDBHelper.delete({ client, database, collection: TempService.COLLECTION, id })
 
     }
 
