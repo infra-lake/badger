@@ -1,5 +1,6 @@
 import { BigQuery, Dataset, TableSchema } from "@google-cloud/bigquery";
 import { ObjectHelper } from "./object.helper";
+import { ThreadHelper } from "./thread.helper";
 
 export type DatasetInput = { client: BigQuery, name: string, create: boolean }
 export type TableInput = { client: BigQuery, dataset: string, table: TableSchema & { name: string }, create: boolean }
@@ -17,6 +18,16 @@ export class BigQueryHelper {
                 await result.create()
             } else {
                 return undefined
+            }
+        }
+
+        if (create) {
+            let _exists = false
+            while (!_exists) {
+                try {
+                    await ThreadHelper.sleep(100)
+                    _exists = (await client.dataset(name).exists())[0]
+                } catch (error) {}
             }
         }
 
@@ -43,6 +54,16 @@ export class BigQueryHelper {
                 return undefined
             }
 
+        }
+
+        if (create) {
+            let _exists = false
+            while (!_exists) {
+                try {
+                    await ThreadHelper.sleep(100)
+                    _exists = (await (__dataset as Dataset).table(table.name).exists())[0]
+                } catch (error) {}
+            }
         }
 
         return result

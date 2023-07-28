@@ -2,18 +2,15 @@ import { Regex } from '../regex'
 import { EnvironmentHelper } from './environment.helper'
 
 export class ApplicationHelper {
-
-    private static readonly DEFAULT_PORT = '4000'
-    private static readonly DEFAULT_IGNORE_COLLECTIONS = ''
     
     public static get PORT(): number {
-        return parseInt(EnvironmentHelper.get('PORT', ApplicationHelper.DEFAULT_PORT))
+        return parseInt(EnvironmentHelper.get('PORT', '4000'))
     }
 
     public static get IGNORE() {
         
         const COLLECTIONS = 
-            EnvironmentHelper.get('IGNORE_COLLECTIONS', ApplicationHelper.DEFAULT_IGNORE_COLLECTIONS)
+            EnvironmentHelper.get('IGNORE_COLLECTIONS', '')
                 .trim()
                 .split(',')
                 .map(stream => stream.trim())
