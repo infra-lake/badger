@@ -12,7 +12,12 @@ export class BigQueryHelper {
 
         const result = client.dataset(name)
 
-        const [exists] = await result.exists()
+        let exists = false
+
+        try {
+            exists = (await result.exists())[0]
+        } catch (error) { }
+
         if (!exists) {
             if (create) {
                 await result.create()
@@ -27,7 +32,7 @@ export class BigQueryHelper {
                 try {
                     await ThreadHelper.sleep(100)
                     _exists = (await client.dataset(name).exists())[0]
-                } catch (error) {}
+                } catch (error) { }
             }
         }
 
@@ -45,7 +50,12 @@ export class BigQueryHelper {
 
         const result = (__dataset as Dataset).table(table.name)
 
-        const [exists] = await result.exists()
+        let exists = false
+
+        try {
+            exists = (await result.exists())[0]
+        } catch (error) { }
+        
         if (!exists) {
 
             if (create) {
@@ -62,7 +72,7 @@ export class BigQueryHelper {
                 try {
                     await ThreadHelper.sleep(100)
                     _exists = (await (__dataset as Dataset).table(table.name).exists())[0]
-                } catch (error) {}
+                } catch (error) { }
             }
         }
 
