@@ -26,7 +26,7 @@ export class VoterBatchController implements RegexBatchController {
         const cursor1 = tasks.find({ context: message, filter: { status: 'created' } })
         if (await cursor1.hasNext()) {
             const { transaction, source, target, database, collection } = await cursor1.next() as ExportTask
-            const worker = free[0].name
+            const worker = free[Math.floor(Math.random() * free.length)].name
             await tasks.start({ context: message, id: { transaction, source, target, database, collection }, document: { worker } })
             const created = await exports.exists({ filter: { transaction, source, target, database, status: 'created' } })
             if (created) {
