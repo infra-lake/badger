@@ -1,16 +1,16 @@
 import { CountDocumentsOptions, Document, Filter, FindOptions, ListCollectionsOptions, ListDatabasesOptions, MongoClient, Sort } from 'mongodb'
-import { AuthHelper } from '../helpers/auth.helper'
-import { MongoDBHelper } from '../helpers/mongodb.helper'
-import { ObjectHelper } from '../helpers/object.helper'
-import { QueryStringHelper } from '../helpers/querystring.helper'
-import { Stamps, StampsHelper } from '../helpers/stamps.helper'
-import { StreamHelper } from '../helpers/stream.helper'
-import { Window, WindowHelper } from '../helpers/window.helper'
-import { Regex, RegexHTTPController, HTTPIncomingMessage, HTTPServerResponse } from '../regex'
-import { ExportService } from '../services/export.service'
-import { Source, SourceService } from '../services/source.service'
+import { AuthHelper } from '../../helpers/auth.helper'
+import { MongoDBHelper } from '../../helpers/mongodb.helper'
+import { ObjectHelper } from '../../helpers/object.helper'
+import { QueryStringHelper } from '../../helpers/querystring.helper'
+import { Stamps, StampsHelper } from '../../helpers/stamps.helper'
+import { StreamHelper } from '../../helpers/stream.helper'
+import { Window, WindowHelper } from '../../helpers/window.helper'
+import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController } from '../../regex'
+import { ExportService } from '../../services/export.service'
+import { Source, SourceService } from '../../services/source.service'
 
-export class ExploreController implements RegexHTTPController {
+export class ManagerExploreHTTPController implements RegexHTTPController {
 
     public static readonly path = '^/explore'
 
@@ -101,7 +101,7 @@ async function _input<T extends Document>(request: HTTPIncomingMessage): Promise
     let source = undefined
     if (ObjectHelper.has(_source)) {
         const service = Regex.inject(SourceService)
-        const { url } = await service.find({ name: _source }).next() as Source
+        const { url } = await service.find({ context: request, filter: { name: _source } }).next() as Source
         source = { name: _source, client: new MongoClient(url) }
     }
 
@@ -124,7 +124,7 @@ function _filter<T extends Document>({ parameters, stamps, window, now }: Export
 
     if (ObjectHelper.has(window.begin)) {
         window.end = window.end ?? now;
-        (filter as any).$expr = ExportService.filter(stamps, window).$expr
+        (filter as any).$expr = ExportService.filter(window, stamps).$expr
     }
 
     const value = (Object.keys(filter).length > 0 ? filter : undefined) as any
@@ -240,7 +240,7 @@ async function _count<T extends Document>({ source, database, collection }: Expo
 
     if (!ObjectHelper.has(source)) {
         const service = Regex.inject(SourceService)
-        return await service.count(filter.value as Partial<Source>)
+        return await service.count({ filter: filter.value as Partial<Source> })
     }
 
     if (!ObjectHelper.has(database) && !ObjectHelper.has(collection)) {
@@ -268,7 +268,7 @@ function _find<T extends Document>({ source, database, collection }: ExportContr
     if (!ObjectHelper.has(source)) {
         const service = Regex.inject(SourceService)
         return service
-            .find(filter.value as Partial<Source>, { projection: { name: 1, _id: 0 } })
+            .find({ filter: filter.value as Partial<Source>, options: { projection: { name: 1, _id: 0 } } })
             .map(({ name: source }) => ({ source }))
             .stream()
     }

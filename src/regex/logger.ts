@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { EnvironmentHelper } from '../helpers/environment.helper'
+import { TransactionalContext } from './context'
 import { HTTPIncomingMessage } from './http'
 
 export enum LogMode {
@@ -7,7 +8,7 @@ export enum LogMode {
     INFO = 'info'
 }
 
-export class Logger {
+export class Logger implements TransactionalContext {
 
     public static get regex() { return '{random}' }
 
@@ -21,7 +22,11 @@ export class Logger {
         return request.logger as Logger
     }
 
+    public get logger() { return this }
+    
     public get transaction() { return this._transaction }
+    public set transaction(transaction: string) { this._transaction = transaction }
+
     public get mode() { return (LogMode as any)[EnvironmentHelper.get('LOG_MODE', 'info')] as LogMode }
 
     public error(message: any, ...fields: any[]) { console.error(this.transaction, message, ...fields) }

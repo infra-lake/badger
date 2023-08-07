@@ -1,8 +1,19 @@
 import { Regex } from '../regex'
 import { EnvironmentHelper } from './environment.helper'
 
+export enum ApplicationMode {
+    MANAGER = 'manager',
+    WORKER = 'worker',
+    VOTER = 'voter',
+    MONOLITH= 'monolith'
+}
+
 export class ApplicationHelper {
-    
+
+    public static get MODE() {
+        return (ApplicationMode as any)[EnvironmentHelper.get('MODE', 'WORKER').toUpperCase()] as ApplicationMode
+    } 
+
     public static get PORT(): number {
         return parseInt(EnvironmentHelper.get('PORT', '4000'))
     }

@@ -1,15 +1,15 @@
-import path from 'path'
 import { readFileSync } from 'fs'
-import { InvalidParameterError } from '../exceptions/invalidparameter.error'
+import path from 'path'
+import { InvalidParameterError } from '../exceptions/invalid-parameter.error'
 import { HTTP, HTTPBootstrapOutput } from './http'
 import { Regex } from './ioc'
 import { Logger } from './logger'
-import { RabbitMQ, RabbitMQBootstrapOutput } from './rabbitmq'
+import { Batch, BatchBootstrapOutput, BatchManager } from './batch'
 
-export type Settings = { http?: boolean, rabbitmq?: boolean }
-export type StartupInput = ({ logger: Logger, http?: HTTPBootstrapOutput, rabbitmq?: RabbitMQBootstrapOutput })
-export type Startup = ((input: StartupInput) => Promise<void>) | ((input: StartupInput) => void)
-export type Shutdown = (() => Promise<void>) | (() => void) | undefined
+export type Settings = { http?: boolean, batch?: boolean }
+export type StartupInput = ({ logger: Logger, http?: HTTPBootstrapOutput, batch?: BatchBootstrapOutput })
+export type Startup = ((input: StartupInput) => Promise<void>) | ((input: StartupInput) => void) | { module: string }
+export type Shutdown = (() => Promise<void>) | (() => void) | { module: string } | undefined
 export type RegexAppCreateInput = { settings: Settings, startup: Startup, shutdown?: Shutdown }
 
 export class RegexApplication {
@@ -29,22 +29,9 @@ export class RegexApplication {
 
         try {
 
-            logger.log(`\n
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░██████╗░███████╗░██████╗░███████╗██╗░░██╗░░███████╗██████╗░░█████╗░███╗░░░███╗███████╗░██╗░░░░░░░██╗░█████╗░██████╗░██╗░░██╗░░
-░░██╔══██╗██╔════╝██╔════╝░██╔════╝╚██╗██╔╝░░██╔════╝██╔══██╗██╔══██╗████╗░████║██╔════╝░██║░░██╗░░██║██╔══██╗██╔══██╗██║░██╔╝░░
-░░██████╔╝█████╗░░██║░░██╗░█████╗░░░╚███╔╝░░░█████╗░░██████╔╝███████║██╔████╔██║█████╗░░░╚██╗████╗██╔╝██║░░██║██████╔╝█████═╝░░░
-░░██╔══██╗██╔══╝░░██║░░╚██╗██╔══╝░░░██╔██╗░░░██╔══╝░░██╔══██╗██╔══██║██║╚██╔╝██║██╔══╝░░░░████╔═████║░██║░░██║██╔══██╗██╔═██╗░░░
-░░██║░░██║███████╗╚██████╔╝███████╗██╔╝╚██╗░░██║░░░░░██║░░██║██║░░██║██║░╚═╝░██║███████╗░░╚██╔╝░╚██╔╝░╚█████╔╝██║░░██║██║░╚██╗░░
-░░╚═╝░░╚═╝╚══════╝░╚═════╝░╚══════╝╚═╝░░╚═╝░░╚═╝░░░░░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░░░░╚═╝╚══════╝░░░╚═╝░░░╚═╝░░░╚════╝░╚═╝░░╚═╝╚═╝░░╚═╝░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-            `)
+            logger.log({ settings })
 
-            process.on('SIGILL', exit(shutdown))
-            process.on('SIGTERM', exit(shutdown))
-            process.on('SIGINT', exit(shutdown))
-
-            const { http = false, rabbitmq = false } = settings
+            const { http = false, batch = false } = settings
 
             const input: StartupInput = { logger }
 
@@ -52,11 +39,20 @@ export class RegexApplication {
                 input.http = await HTTP.bootstrap()
             }
 
-            if (rabbitmq) {
-                input.rabbitmq = await RabbitMQ.bootstrap()
+            if (batch) {
+                input.batch = await Batch.bootstrap()
             }
 
-            await startup(input)
+            process.on('SIGILL', exit(input, shutdown))
+            process.on('SIGTERM', exit(input, shutdown))
+            process.on('SIGINT', exit(input, shutdown))
+
+            if (typeof startup === 'function') {
+                await startup(input)
+            } else {
+                const { startup: _startup } = await import(startup.module)
+                await _startup(input)
+            }
 
         } catch (error) {
             logger.error('unexpected error:', error)
@@ -73,11 +69,23 @@ export class RegexApplication {
 
 }
 
-function exit(shutdown: Shutdown) {
+function exit({ batch }: StartupInput, shutdown: Shutdown) {
+
     return async () => {
+        
+        await batch?.manager.stop()
+        
         if (shutdown) {
-            await shutdown()
+            if (typeof shutdown === 'function') {
+                await shutdown()
+            } else {
+                const { shutdown: _shutdown } = await import(shutdown.module)
+                await _shutdown()
+            }
         }
+
         process.exit(0)
+    
     }
+
 }

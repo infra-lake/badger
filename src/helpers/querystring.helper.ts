@@ -1,5 +1,5 @@
 import qs from 'qs'
-import { BadRequestError } from '../exceptions/badrequest.error'
+import { BadRequestError } from '../exceptions/bad-request.error'
 import { DateHelper } from './date.helper'
 import { NumberHelper } from './number.helper'
 
@@ -101,11 +101,22 @@ export class QueryStringHelper {
     }
 
 
-    public static stringify(object: any): string {
-        const result = Buffer.from(qs.stringify(object, {
-            encoder: QueryStringHelper.encoder, encodeValuesOnly: true, charset: 'utf-8'
-        }), 'utf-8').toString('base64')
+    public static stringify(object: any, mode: 'base64' | 'qs' = 'base64'): string {
+        
+        const string = qs.stringify(object, {
+            encoder: QueryStringHelper.encoder,
+            encodeValuesOnly: true,
+            charset: 'utf-8'
+        })
+
+        if (mode === 'qs') {
+            return string
+        }
+
+        const result = Buffer.from(string, 'utf-8').toString('base64')
+        
         return result
+        
     }
 
     private static encoder(value: any, defaultEncoder: qs.defaultEncoder, charset: string, type: "value" | "key"): string {

@@ -17,6 +17,20 @@ export class EnvironmentHelper {
 
     }
 
+    public static list(regex: string): Array<{ key: string, value: string }> {
+
+        const result =
+            Object
+                .keys(process.env)
+                .filter(key => !StringHelper.empty(key))
+                .filter(key => key.match(regex) ?? key === regex)
+                .map(key => ({ key, value: process.env[key] }))
+                .filter(({ value }) => !StringHelper.empty(value))
+
+        return result as Array<{ key: string, value: string }>
+
+    }
+
     public static set(name: string, value?: string) {
         process.env[name] = value?.trim()
     }

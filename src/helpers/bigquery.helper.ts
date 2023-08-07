@@ -1,6 +1,6 @@
-import { BigQuery, Dataset, TableSchema } from "@google-cloud/bigquery";
-import { ObjectHelper } from "./object.helper";
-import { ThreadHelper } from "./thread.helper";
+import { BigQuery, Dataset, Table, TableSchema } from '@google-cloud/bigquery';
+import { ObjectHelper } from './object.helper';
+import { ThreadHelper } from './thread.helper';
 
 export type DatasetInput = { client: BigQuery, name: string, create: boolean }
 export type TableInput = { client: BigQuery, dataset: string, table: TableSchema & { name: string }, create: boolean }
@@ -8,7 +8,7 @@ export type SanitizeInput = { value: string }
 
 export class BigQueryHelper {
 
-    public static async dataset({ client, name, create }: DatasetInput) {
+    public static async dataset({ client, name, create }: DatasetInput): Promise<Dataset | undefined> {
 
         const result = client.dataset(name)
 
@@ -16,64 +16,47 @@ export class BigQueryHelper {
 
         try {
             exists = (await result.exists())[0]
-        } catch (error) { }
-
-        if (!exists) {
-            if (create) {
-                await result.create()
-            } else {
-                return undefined
-            }
+        } catch (error) {
+            exists = false
         }
 
-        if (create) {
-            let _exists = false
-            while (!_exists) {
-                try {
-                    await ThreadHelper.sleep(100)
-                    _exists = (await client.dataset(name).exists())[0]
-                } catch (error) { }
-            }
+        if (!exists && create) {
+            try { await result.create() } catch (error) { }
+            ThreadHelper.sleep(1000)
+            return await BigQueryHelper.dataset({ client, name, create })
+        } else if (!exists) {
+            return undefined
         }
 
         return result
 
     }
 
-    public static async table({ client, dataset: _dataset, table, create }: TableInput) {
+    public static async table({ client, dataset: _dataset, table, create }: TableInput): Promise<Table | undefined> {
 
-        const __dataset = await BigQueryHelper.dataset({ client, name: _dataset, create })
+        const dataset = await BigQueryHelper.dataset({ client, name: _dataset, create })
 
-        if (!ObjectHelper.has(__dataset) && !create) {
+        if (!ObjectHelper.has(dataset) && !create) {
             return undefined
         }
 
-        const result = (__dataset as Dataset).table(table.name)
+        const result = (dataset as Dataset).table(table.name)
 
         let exists = false
 
         try {
             exists = (await result.exists())[0]
-        } catch (error) { }
-        
-        if (!exists) {
-
-            if (create) {
-                await result.create({ schema: table.fields })
-            } else {
-                return undefined
-            }
-
+        } catch (error) {
+            exists = false
         }
 
-        if (create) {
-            let _exists = false
-            while (!_exists) {
-                try {
-                    await ThreadHelper.sleep(100)
-                    _exists = (await (__dataset as Dataset).table(table.name).exists())[0]
-                } catch (error) { }
-            }
+        if (!exists && create) {
+            try { await result.create({ schema: table.fields }) } catch (error) { }
+            ThreadHelper.sleep(1000)
+            return await BigQueryHelper.table({ client, dataset: _dataset, table, create })
+
+        } else if (!exists) {
+            return undefined
         }
 
         return result

@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto'
 import { ObjectHelper } from '../helpers/object.helper'
-import { RegexHTTPController } from './http'
-import { RegexRabbitMQController } from './rabbitmq'
 import { StringHelper } from '../helpers/string.helper'
+import { RegexHTTPController } from './http'
+import { RegexBatchController } from './batch'
 
 export enum RegexField {
     ID = '__regex_ioc_id',
@@ -16,17 +16,17 @@ export type RegexClass<T> = new (...args: any[]) => T
 export type RegexKey<T> = string | RegexClass<T>
 
 export type RegexHTTPControllerClass<T extends RegexHTTPController> = RegexClass<T> & { path: string }
-export type RegexAMQPControllerClass<T extends RegexRabbitMQController> = RegexClass<T> & { pattern: string }
+export type RegexBatchControllerClass<T extends RegexBatchController> = RegexClass<T>
 
-export type RegexAMQPControllerClassType = 'http' | 'rabbitmq'
-export type RegexAMQPClassType = 'service' | RegexAMQPControllerClassType
+export type RegexControllerClassType = 'http' | 'batch'
+export type RegexClassType = 'service' | RegexControllerClassType
 
 export class Regex {
-    
+
     private static readonly instances: { [key: string]: any } = {}
 
-    public static controllers(type?: RegexAMQPControllerClassType) {
-        const result = 
+    public static controllers(type?: RegexControllerClassType) {
+        const result =
             Object
                 .keys(this.instances)
                 .filter(key => this.instances[key][RegexField.CONTROLLER])
@@ -35,7 +35,7 @@ export class Regex {
         return result
     }
 
-    public static inject<T>(key: RegexKey<T>, type?: RegexAMQPClassType): T {
+    public static inject<T>(key: RegexKey<T>, type?: RegexClassType): T {
 
         const text: string =
             typeof key === 'string'
@@ -62,7 +62,7 @@ export class Regex {
                 })
                 .filter(regex => text.match(regex) ?? text === regex)
                 .flatMap(key => Regex.instances[key])
-        
+
         const result =
             instances.length > 1
                 ? instances
@@ -78,7 +78,12 @@ export class Regex {
 
     }
 
-    public static controller<T extends RegexHTTPController | RegexRabbitMQController | undefined>(_controller: T extends RegexHTTPController ? RegexHTTPControllerClass<T> : T extends RegexRabbitMQController ? RegexAMQPControllerClass<T> : undefined, ...args: any[]): T {
+    public static controller<T extends RegexHTTPController | RegexBatchController | undefined>(
+        _controller
+            : T extends RegexHTTPController ? RegexHTTPControllerClass<T>
+            : T extends RegexBatchController ? RegexBatchControllerClass<T>
+            : undefined, ...args: any[]
+    ): T {
 
         if (!ObjectHelper.has(_controller)) {
             return undefined as T
@@ -91,11 +96,11 @@ export class Regex {
         }
 
         type[RegexField.ID] = `${type.name}-${randomUUID()}-${new Date().getTime()}`
-        type[RegexField.REGEX] = 'path' in type ? type.path : type.pattern
+        type[RegexField.REGEX] = 'path' in type ? type.path : `^${type.name}$`
         type[RegexField.MULTIPLE] = true
         type[RegexField.TYPE] = type.name
         type[RegexField.MULTIPLE] = type[RegexField.MULTIPLE]
-        type[RegexField.CONTROLLER] = 'path' in type ? 'http' : 'rabbitmq'
+        type[RegexField.CONTROLLER] = 'path' in type ? 'http' : 'batch'
 
         const instance: any = new type(...args)
         instance[RegexField.ID] = type[RegexField.ID]

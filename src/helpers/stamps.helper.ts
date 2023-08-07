@@ -16,7 +16,7 @@ export class StampsHelper {
     public static get DEFAULT_STAMP_UPDATE() { return EnvironmentHelper.get('DEFAULT_STAMP_UPDATE', 'updatedAt') }
     public static get DEFAULT_STAMP_DATASET_NAME_PREFIX() { return EnvironmentHelper.get('DEFAULT_STAMP_DATASET_NAME_PREFIX', 'raw_mongodb_') }
 
-    public static extract(object: any, attribute: string = '__stamps') {
+    public static extract(object: any = {}, attribute: string = '__stamps') {
 
         const stamps = (object?.[attribute] ?? {}) as Stamps
 

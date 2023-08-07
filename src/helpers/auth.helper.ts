@@ -14,6 +14,7 @@ export class AuthHelper {
         }
 
         const authorization = request.headers['authorization'] ?? ''
+
         const [strategy = AuthHelper.NO_AUTH, token = ''] = authorization.split(' ').filter(value => value)
         const method = strategy.toLowerCase()
 
@@ -39,6 +40,22 @@ export class AuthHelper {
     private static basic(token: string): boolean {
         const [user, password] = Buffer.from(token, 'base64').toString('utf-8').split(':')
         return user === EnvironmentHelper.get('AUTH_USER') && password === EnvironmentHelper.get('AUTH_PASS')
+    }
+
+    public static header() {
+
+        const mode = EnvironmentHelper.get('AUTH_MODE', AuthHelper.NO_AUTH).toLowerCase()
+
+        if (mode === AuthHelper.NO_AUTH) {
+            return {}
+        }
+
+        const token = Buffer.from(`${EnvironmentHelper.get('AUTH_USER', '').trim()}:${EnvironmentHelper.get('AUTH_PASS', '').trim()}`).toString('base64')
+
+        return {
+            'authorization': `Basic ${token}`
+        }
+
     }
 
 }

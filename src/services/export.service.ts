@@ -1,198 +1,325 @@
-import { BigQuery, Table } from '@google-cloud/bigquery'
-import bytes from 'bytes'
-import { CountOptions, Document, Filter, FindOptions, MongoClient } from 'mongodb'
-import { BadRequestError } from '../exceptions/badrequest.error'
-import { BigQueryHelper } from '../helpers/bigquery.helper'
-import { EnvironmentHelper } from '../helpers/environment.helper'
-import { MongoDBDocument, MongoDBHelper } from '../helpers/mongodb.helper'
+import { Filter } from 'mongodb'
+import { BadRequestError } from '../exceptions/bad-request.error'
+import { InvalidStateChangeError } from '../exceptions/invalid-state-change.error'
+import { NotFoundError } from '../exceptions/not-found.error'
+import { UnsupportedOperationError } from '../exceptions/unsupported-operation.error'
+import { ApplicationHelper, ApplicationMode } from '../helpers/application.helper'
+import { MongoDBDocument, MongoDBGetInput, MongoDBService, MongoDBValidationInput } from '../helpers/mongodb.helper'
 import { ObjectHelper } from '../helpers/object.helper'
-import { RabbitMQHelper } from '../helpers/rabbitmq.helper'
 import { Stamps, StampsHelper } from '../helpers/stamps.helper'
 import { StringHelper } from '../helpers/string.helper'
 import { Window } from '../helpers/window.helper'
-import { Logger, Regex, TransactionalContext } from '../regex'
-import { ExportWorker } from '../workers/export.worker'
+import { Regex, TransactionalContext } from '../regex'
+import { ExportTaskService } from './export.task.service'
 import { SettingsService } from './settings.service'
 import { Source, SourceService } from './source.service'
 import { Target, TargetService } from './target.service'
-import { Temp, TempService } from './temp.service'
 
-export interface ExportSource {
-    name: Source['name']
-    database: string
-    collection: string
-}
-
-export interface ExportTarget {
-    name: Target['name']
-}
-
-export interface ExportSettings {
-    attempts: number
-    limit: number
-    stamps: Stamps
-}
-
-export interface Export extends MongoDBDocument<Export, 'transaction' | 'source' | 'target'> {
+export interface Export extends MongoDBDocument<Export, 'transaction' | 'source' | 'target' | 'database'> {
     transaction: string
-    source: ExportSource
-    target: ExportTarget
-    settings: ExportSettings
-    window: Window
-    status: 'pending' | 'success' | 'error'
-    error?: { message: string, cause: any }
+    source: Source['name']
+    target: Target['name']
+    database: string
+    status: 'created' | 'running' | 'terminated' | 'stopped' | 'error'
 }
 
-export type Export4Create = Pick<Export, 'transaction' | 'source' | 'target' | 'settings' | 'window'>
-export type Export4Update = Pick<Export, 'status' | 'error'>
+export type ExportStateChangeInput = Pick<MongoDBValidationInput<Export, 'transaction' | 'source' | 'target' | 'database'>, 'id'> & { context: TransactionalContext }
 
-export type ExportServiceCleanupInput = Pick<Export, 'target'> & { logger: Logger }
-export type ExportServiceDatasetInput = Pick<ExportSource, 'database'> & { prefix: string }
-export type ExportServiceTableInput = { client: BigQuery, transaction: Export['transaction'], source: Pick<ExportSource, 'database' | 'collection'>, prefix: string, type: 'main' | 'temporary', create: boolean }
-export type ExportServiceSettings = Pick<ExportSettings, 'attempts' | 'limit'>
-export type ExportServiceLimits = { count: number, bytes: number }
+export class ExportService extends MongoDBService<Export, 'transaction' | 'source' | 'target' | 'database'> {
 
-export class ExportService {
+    protected get database() { return SettingsService.DATABASE }
+    public get collection() { return 'exports' }
 
-    public static readonly COLLECTION = 'exports'
+    public async check({ context, id }: Pick<MongoDBGetInput<Export, 'transaction' | 'source' | 'target' | 'database'>, 'context' | 'id'>) {
 
-    private _settings?: ExportServiceSettings
-    public settings(input?: Export4Create) {
-
-        if (!ObjectHelper.has(this._settings)) {
-            const attempts = parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_SETTING_ATTEMPS', '3'))
-            const limit = parseInt(EnvironmentHelper.get('DEFAULT_EXPORT_SETTING_LIMIT', '1000'))
-            this._settings = { attempts, limit }
+        if (![ApplicationMode.MANAGER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
+            throw new UnsupportedOperationError(`${ExportService.name}.check()`)
         }
 
-        const attempts = input?.settings?.attempts ?? this._settings?.attempts as number
-        const limit = input?.settings?.limit ?? this._settings?.limit as number
+        const document = await this.get({ context, id }) as Export
 
-        const stamps = StampsHelper.extract(input?.settings, 'stamps')
-
-        const result: ExportSettings = { attempts, limit, stamps }
-
-        return result
-
-    }
-
-    private _limits?: ExportServiceLimits
-    public limits() {
-        if (!ObjectHelper.has(this._limits)) {
-            const count = parseInt(EnvironmentHelper.get('EXPORT_LIMIT_COUNT', '500'))
-            const _bytes = bytes(EnvironmentHelper.get('EXPORT_LIMIT_BYTES', '15MB'))
-            this._limits = { count, bytes: _bytes }
-        }
-        return this._limits as ExportServiceLimits
-    }
-
-    public find(filter: Filter<Export>, options?: FindOptions<Export>) {
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const result = MongoDBHelper.find({ client, database, collection: ExportService.COLLECTION, filter, options })
-        return result
-    }
-
-    public async get({ transaction, source, target }: Pick<Export, 'transaction' | 'source' | 'target'>) {
-
-        const cursor = this.find({ transaction, source, target })
-
-        if (await cursor.hasNext()) {
-            return await cursor.next() as Export
+        if (!ObjectHelper.has(document)) {
+            throw new NotFoundError('export')
         }
 
-        return undefined
+        const { status } = document
+
+        return { status }
 
     }
 
-    public async count(filter: Partial<Export>, options?: CountOptions) {
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const result = MongoDBHelper.count({ client, database, collection: ExportService.COLLECTION, filter, options })
-        return result
+    public async create({ context, id }: ExportStateChangeInput) {
+
+        if (![ApplicationMode.MANAGER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
+            throw new UnsupportedOperationError(`${ExportService.name}.create()`)
+        }
+
+        context?.logger.log('creating export...')
+
+        await this.validate({ id, on: 'create' })
+
+        const { transaction, source, target, database } = id
+
+        const result = await this._collection.findOneAndUpdate(
+            { source, target, database, $or: [{ status: 'created' }, { status: 'running' }] },
+            { $setOnInsert: { transaction, source, target, database, status: 'created' } },
+            { upsert: true, returnDocument: 'after' }
+        )
+
+        if (!result.ok) {
+            throw new Error('error when try to create export', result.lastErrorObject)
+        }
+
+        if (transaction !== result.value?.transaction) {
+            throw new Error(`there is another export created, see transaction "${result.value?.transaction}"`)
+        }
+
+        try {
+            const service = Regex.inject(ExportTaskService)
+            const tasks = await service.from(id)
+            await Promise.all(tasks.map(async ({ id }) => await service.create({ context, id })))
+        } catch (error) {
+            await this._collection.deleteOne({ transaction, source, target, database })
+            throw error
+        }
+
+        context?.logger.log('export created now')
+
     }
 
-    public async exists(filter: Partial<Export>, options?: CountOptions) {
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const result = MongoDBHelper.exists({ client, database, collection: ExportService.COLLECTION, filter, options })
-        return result
+    public async start({ context, id }: ExportStateChangeInput) {
+
+        if (![ApplicationMode.VOTER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
+            throw new UnsupportedOperationError(`${ExportService.name}.start()`)
+        }
+
+        context?.logger.log('changing state of export to running...')
+
+        await this.validate({ id, on: 'start' })
+
+        const { transaction, source, target, database } = id
+
+        const result = await this._collection.findOneAndUpdate(
+            { transaction, source, target, database, status: 'created' },
+            { $set: { status: 'running' } },
+            { upsert: false, returnDocument: 'after' }
+        )
+
+        if (!result.ok) {
+            throw new Error('error when try to run export', result.lastErrorObject)
+        }
+
+        if (!ObjectHelper.has(result.value)) {
+            throw new Error('does not possible update export to runnig because export is not found')
+        }
+
+        if (((result.value?.status as Export['status']) !== 'running')) {
+            throw new Error('does not possible update export to runnig')
+        }
+
+        context?.logger.log('state of export is running now')
+
     }
 
-    public async create(input: Export4Create) {
+    public async finish({ context, id }: ExportStateChangeInput) {
 
-        await this.validate(input);
+        if (![ApplicationMode.VOTER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
+            throw new UnsupportedOperationError(`${ExportService.name}.finish()`)
+        }
 
-        input.settings = this.settings(input)
-        input.window = await this.window(input);
+        context?.logger.log('changing state of export to terminating...')
 
-        (input as Export).status = 'pending'
+        await this.validate({ id, on: 'finish' })
 
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const id = { transaction: input.transaction, source: input.source, target: input.target }
+        const { transaction, source, target, database } = id
 
-        await MongoDBHelper.save({
-            client,
-            database,
-            collection: ExportService.COLLECTION,
-            id,
-            document: input as Export
-        })
+        const result = await this._collection.findOneAndUpdate(
+            { transaction, source, target, database, status: 'running' },
+            { $set: { status: 'terminated' } },
+            { upsert: false, returnDocument: 'after' }
+        )
 
-        const queue = `export:${id.source.name}:${id.source.database}:${id.source.collection}:${id.target.name}`
+        if (!result.ok) {
+            throw new Error('error when try to terminate export', result.lastErrorObject)
+        }
 
-        await RabbitMQHelper.assert({
-            kind: 'queue',
-            name: queue,
-            options: { durable: true }
-        })
+        if (!ObjectHelper.has(result.value)) {
+            throw new Error('does not possible update export to terminated because export is not found')
+        }
 
-        await RabbitMQHelper.produce({
-            queue,
-            content: JSON.stringify({ transaction: id.transaction }),
-            options: {
-                correlationId: id.transaction
+        if (((result.value?.status as Export['status']) !== 'terminated')) {
+            throw new Error('does not possible update export to terminated')
+        }
+
+        context?.logger.log('state of export is terminated now')
+
+    }
+
+    public async stop({ context, id }: ExportStateChangeInput) {
+
+        if (![ApplicationMode.MANAGER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
+            throw new UnsupportedOperationError(`${ExportService.name}.stop()`)
+        }
+
+        context?.logger.log('changing state of export to stop...')
+
+        await this.validate({ id, on: 'stop' })
+
+        const { transaction, source, target, database } = id
+
+        const result = await this._collection.findOneAndUpdate(
+            { transaction, source, target, database, $or: [{ status: 'created' }, { status: 'running' }] },
+            { $set: { status: 'stopped' } },
+            { upsert: false, returnDocument: 'after' }
+        )
+
+        if (!result.ok) {
+            throw new Error('error when try to stop export', result.lastErrorObject)
+        }
+
+        if (!ObjectHelper.has(result.value)) {
+            throw new Error('does not possible update export to stop because export is not found')
+        }
+
+        if (((result.value?.status as Export['status']) !== 'stopped')) {
+            throw new Error('does not possible update export to stop')
+        }
+
+        const tasks = Regex.inject(ExportTaskService)
+        await tasks.stop({ context, id, document: { date: new Date() } })
+
+        context?.logger.log('state of export is stopped now')
+
+    }
+
+    public async error({ context, id }: ExportStateChangeInput) {
+
+        if (![ApplicationMode.VOTER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
+            throw new UnsupportedOperationError(`${ExportService.name}.error()`)
+        }
+
+        context?.logger.log('changing state of export to error...')
+
+        await this.validate({ id, on: 'error' })
+
+        const { transaction, source, target, database } = id
+
+        const result = await this._collection.findOneAndUpdate(
+            { transaction, source, target, database, $or: [{ status: 'created' }, { status: 'running' }] },
+            { $set: { status: 'error' } },
+            { upsert: false, returnDocument: 'after' }
+        )
+
+        if (!result.ok) {
+            throw new Error('error when try to set error on export', result.lastErrorObject)
+        }
+
+        if (!ObjectHelper.has(result.value)) {
+            throw new Error('does not possible update export to error because export is not found')
+        }
+
+        if (((result.value?.status as Export['status']) !== 'error')) {
+            throw new Error('does not possible update export to error')
+        }
+
+        context?.logger.log('state of export is error now')
+
+    }
+
+    public async retry({ context, id }: ExportStateChangeInput) {
+
+        if (![ApplicationMode.MANAGER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
+            throw new UnsupportedOperationError(`${ExportService.name}.error()`)
+        }
+
+        context?.logger.log('changing state of export to created...')
+
+        await this.validate({ id, on: 'retry' })
+
+        const { transaction, source, target, database } = id
+
+        const service = Regex.inject(ExportTaskService)
+        await service.retry({ context, id: { transaction, source, target, database } })
+
+        const result = await this._collection.findOneAndUpdate(
+            { transaction, source, target, database, status: 'error' },
+            { $set: { status: 'created' } },
+            { upsert: false, returnDocument: 'after' }
+        )
+
+        if (!result.ok) {
+            throw new Error('error when try to set created on export', result.lastErrorObject)
+        }
+
+        if (!ObjectHelper.has(result.value)) {
+            throw new Error('does not possible update export to created because export is not found')
+        }
+
+        if (((result.value?.status as Export['status']) !== 'error')) {
+            throw new Error('does not possible update export to created')
+        }
+
+        context?.logger.log('state of export is created now')
+
+    }
+
+    public async validate({ id, on }: MongoDBValidationInput<Export, 'transaction' | 'source' | 'target' | 'database'>) {
+
+        const type = ExportTaskService.name
+
+        if (on === 'insert' || on === 'update') {
+            throw new UnsupportedOperationError(`${ExportService.name}.save()`)
+        }
+
+        if (on === 'delete') {
+            throw new UnsupportedOperationError(`${ExportService.name}.delete()`)
+        }
+
+        if (StringHelper.empty(id.transaction)) { throw new BadRequestError('transaction is missing') }
+
+        const { transaction, source, target, database } = id
+
+        if (['create', 'retry'].includes(on)) {
+
+            const _source = Regex.inject(SourceService)
+            const __source = await _source.get({ id: { name: source } })
+            const { url = '' } = __source ?? {}
+            await _source.test({ url })
+
+            const _target = Regex.inject(TargetService)
+            const __target = await _target.get({ id: { name: target } })
+            const { credentials } = __target ?? {}
+            await _target.test({ credentials })
+
+        }
+
+        if (['start', 'finish', 'stop', 'error'].includes(on)) {
+
+            const found = await this.get({ id: { transaction, source, target, database } }) as Export
+            const { status: old } = found ?? {}
+
+            if (!ObjectHelper.has(old)) {
+                throw new NotFoundError('export')
             }
-        })
 
-        return input.transaction
+            if (on === 'start' && old !== 'created') {
+                throw new InvalidStateChangeError({ type, on, status: { old, new: 'running', valids: ['created'] } })
+            }
 
-    }
+            if (on === 'finish' && old !== 'running') {
+                throw new InvalidStateChangeError({ type, on, status: { old, new: 'terminated', valids: ['running'] } })
+            }
 
-    private async window(input: Export4Create) {
-        const begin = input.window?.begin ?? await this.last(input)
-        const end = input.window?.end ?? new Date();
-        return { begin, end }
-    }
+            if (['stop', 'error'].includes(on) && !['created', 'running'].includes(old as string)) {
+                const status: Export['status'] = on === 'stop' ? 'stopped' : 'error'
+                throw new InvalidStateChangeError({ type, on, status: { old, new: status, valids: ['created', 'running'] } })
+            }
 
-    public async update(context: TransactionalContext, { transaction, source, target }: Pick<Export, 'transaction' | 'source' | 'target'>, { status, error }: Export4Update) {
-
-        const { logger } = context
-
-        const document = await this.get({ transaction, source, target }) as Export
-
-        document.status = status
-        document.error = error
-
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-
-        const id = { transaction, source, target }
-
-        await MongoDBHelper.save({
-            client,
-            database,
-            collection: ExportService.COLLECTION,
-            id,
-            document
-        })
-
-        await this.cleanup({ logger: logger, target })
+        }
 
     }
 
-    public static filter(stamps: Stamps, window: Window): Document {
+    public static filter(window: Window, stamps: Stamps = StampsHelper.extract()): Filter<Document> {
 
         const date = {
             $ifNull: [
@@ -226,382 +353,5 @@ export class ExportService {
 
     }
 
-    private async last({ source, target }: Pick<Export4Create, 'source' | 'target'>): Promise<Date> {
-
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-
-        const cursor = client.db(database).collection(ExportService.COLLECTION).aggregate([
-            { $match: { source, target, status: 'success' } },
-            {
-                $group: {
-                    _id: { source: "$source", target: "$target" },
-                    value: { $max: "$window.end" }
-                }
-            }
-        ])
-
-        if (await cursor.hasNext()) {
-            const { value } = await cursor.next() as any;
-            return value
-        }
-
-        return new Date(0)
-
-    }
-
-    public async validate(document: Export4Create) {
-
-        if (!ObjectHelper.has(document)) {
-            throw new BadRequestError('export is empty')
-        }
-
-        if (!ObjectHelper.has(document.source)) {
-            throw new BadRequestError('export.source is empty')
-        }
-
-        if (!ObjectHelper.has(document.source.name)) {
-            throw new BadRequestError('export.source.name is empty')
-        }
-
-        const source = await Regex.inject(SourceService).get({ name: document.source.name })
-        if (!ObjectHelper.has(source)) {
-            throw new BadRequestError('export.source.name is invalid or does not exists')
-        }
-
-        let client = undefined
-
-        try {
-            client = new MongoClient(source?.url as string)
-        } catch (error) {
-            throw new BadRequestError(`export.source.name is invalid:`, error)
-        }
-
-        if (!ObjectHelper.has(document.source.database)) {
-            throw new BadRequestError('export.source.database is empty')
-        }
-
-        const databases = await MongoDBHelper.databases({ client })
-        if (!databases.map(({ name }) => name).includes(document.source.database)) {
-            throw new BadRequestError('export.source.database is invalid or does not exists')
-        }
-
-        if (!ObjectHelper.has(document.source.collection)) {
-            throw new BadRequestError('export.source.collection is empty')
-        }
-
-        const collections = await MongoDBHelper.collections({ client, database: document.source.database })
-        if (!collections.map(({ collectionName: name }) => name).includes(document.source.collection)) {
-            throw new BadRequestError('export.source.collection is invalid or does not exists')
-        }
-
-        if (!ObjectHelper.has(document.target)) {
-            throw new BadRequestError('export.target is empty')
-        }
-
-        if (!ObjectHelper.has(document.target.name)) {
-            throw new BadRequestError('export.target.name is empty')
-        }
-
-        const target = await Regex.inject(TargetService).get({ name: document.target.name })
-        if (!ObjectHelper.has(source)) {
-            throw new BadRequestError('export.target.name is invalid or does not exists')
-        }
-
-        try {
-            await new BigQuery({ credentials: target?.credentials }).getDatasets({ maxResults: 1 })
-        } catch (error) {
-            throw new BadRequestError(`export.target.name is invalid:`, error)
-        }
-
-        if (ObjectHelper.has(document.settings)) {
-
-            const _limits = this.limits()
-            if (ObjectHelper.has(document.settings.limit) && document.settings.limit > _limits.count) {
-                throw new BadRequestError('export.settings.limit must not be more than', _limits.count)
-            }
-
-            if (ObjectHelper.has(document.settings.attempts) && document.settings.attempts < 0) {
-                throw new BadRequestError('export.settings.attempts is invalid')
-            }
-
-            if (ObjectHelper.has(document.settings.stamps)) {
-
-                if (ObjectHelper.has(document.settings.stamps.id) && document.settings.stamps.id.trim.length < 1) {
-                    throw new BadRequestError('export.settings.stamps.id is invalid')
-                }
-
-                if (ObjectHelper.has(document.settings.stamps.insert) && document.settings.stamps.insert.trim.length < 1) {
-                    throw new BadRequestError('export.settings.stamps.insert is invalid')
-                }
-
-                if (ObjectHelper.has(document.settings.stamps.update) && document.settings.stamps.update.trim.length < 1) {
-                    throw new BadRequestError('export.settings.stamps.update is invalid')
-                }
-
-            }
-
-        }
-
-    }
-
-    public async delete({ transaction, source, target }: Pick<Export, 'transaction' | 'source' | 'target'>) {
-
-        if (StringHelper.empty(transaction)) {
-            throw new BadRequestError(`export.transaction is empty`)
-        }
-
-        if (!ObjectHelper.has(source)) {
-            throw new BadRequestError(`export.source is empty`)
-        }
-
-        if (StringHelper.empty(source.name)) {
-            throw new BadRequestError(`export.source.name is empty`)
-        }
-
-        if (!ObjectHelper.has(target)) {
-            throw new BadRequestError(`export.target is empty`)
-        }
-
-        if (StringHelper.empty(target.name)) {
-            throw new BadRequestError(`export.target.name is empty`)
-        }
-
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const id = { transaction, source: { name: source.name }, target: { name: target.name } }
-
-        await MongoDBHelper.delete({ client, database, collection: ExportService.COLLECTION, id })
-
-    }
-
-    public async bigquery({ name }: Pick<ExportTarget, 'name'>) {
-        const service = Regex.inject(TargetService)
-        const { credentials } = await service.find({ name }).next() as Target
-        const client = new BigQuery({ credentials })
-        return client
-    }
-
-    public dataset({ prefix, database }: ExportServiceDatasetInput) {
-        const result = BigQueryHelper.sanitize({ value: `${prefix}${database}` })
-        return result
-    }
-
-    public async table({ client, transaction, source, prefix, type, create }: ExportServiceTableInput) {
-
-        const { database, collection } = source
-
-        let name = BigQueryHelper.sanitize({ value: collection })
-
-        if (type === 'temporary') {
-            name = BigQueryHelper.sanitize({ value: `${name}_${transaction}_temp` })
-        }
-
-        const schema = {
-            name,
-            fields: [
-                { name: StampsHelper.DEFAULT_STAMP_ID, type: 'STRING', mode: 'REQUIRED' },
-                { name: StampsHelper.DEFAULT_STAMP_INSERT, type: 'TIMESTAMP', mode: 'REQUIRED' },
-                { name: 'data', type: 'JSON', mode: 'REQUIRED' },
-                { name: 'hash', type: 'STRING', mode: 'REQUIRED' }
-            ]
-        }
-
-        const service = Regex.inject(ExportService)
-
-        const dataset = service.dataset({ prefix, database })
-
-        const result = await BigQueryHelper.table({ client, dataset, table: schema, create })
-
-        return result
-
-    }
-
-    private async cleanup({ logger, target: _target }: ExportServiceCleanupInput) {
-
-        logger.log('starting cleanup...')
-
-        const _export = Regex.inject(ExportService)
-        const temp = Regex.inject(TempService)
-
-        const _client = await this.bigquery(_target)
-
-        const prefixes = [StampsHelper.DEFAULT_STAMP_DATASET_NAME_PREFIX]
-
-        logger.log('removing orphan tables...')
-
-        const temps = temp.find({}, { projection: { transaction: 1, source: 1, target: 1 } })
-        while (await temps.hasNext()) {
-
-            const { transaction, source, target } = await temps.next() as Temp
-            const id = { transaction, source, target }
-            const database = source.database
-
-            await Promise.all(prefixes.map(async (prefix) => {
-
-                const dataset = this.dataset({ prefix, database })
-
-                if (!await _export.exists(id)) {
-
-                    try {
-
-                        await temp.delete(id)
-
-                        const temporary = await this.table({ client: _client, transaction, source, prefix, type: 'temporary', create: false })
-                        await temporary?.delete({ ignoreNotFound: true })
-
-                    } catch (error) {
-                        logger.error(`does not possible delete temporary orphan bigquery table "${dataset}":`, error)
-                    }
-
-                }
-
-            }))
-
-        }
-
-        logger.log('removing temporary tables and collections...')
-
-        const exports = _export.find({ status: 'success' })
-        while (await exports.hasNext()) {
-
-            const { transaction, source, target, settings } = await exports.next() as Export
-            const prefix = settings.stamps.dataset.name
-
-            if (!prefixes.includes(prefix)) {
-                prefixes.push(prefix)
-            }
-
-            const database = source.database
-
-            const id = { transaction, source, target }
-
-            if (await temp.exists(id)) {
-
-                try {
-
-                    await temp.delete(id)
-
-                } catch (error) {
-                    logger.error(`does not possible delete temp collection for export (transaction: "${transaction}", source: ${JSON.stringify(source)} , target: ${JSON.stringify(target)}):`, error)
-                }
-
-            }
-
-            const _dataset = this.dataset({ prefix, database })
-
-            try {
-
-                const client =
-                    target.name === target.name
-                        ? _client
-                        : await this.bigquery(target)
-
-                const __dataset = await BigQueryHelper.dataset({ client, name: _dataset, create: false })
-
-                const cursor = await __dataset?.getTables()
-
-                const tables = cursor?.[0]
-
-                if (ObjectHelper.has(tables)) {
-
-                    for (const table of (tables as Table[])) {
-
-                        if (table.id?.endsWith('_temp')) {
-
-                            const split = table.id.replace(/_temp$/g, '').split('_')
-                            const transaction = `${split[split.length - 4]}-${split[split.length - 3]}-${split[split.length - 2]}-${split[split.length - 1]}`
-
-                            if (!await temp.exists({ transaction })) {
-
-                                await table?.delete({ ignoreNotFound: true })
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            } catch (error) {
-                logger.error(`does not possible delete temporary bigquery table "${_dataset}" for export (transaction: "${transaction}", source: ${JSON.stringify(source)} , target: ${JSON.stringify(target)}):`, error)
-            }
-
-        }
-
-        logger.log('cleanup finished successfully')
-
-    }
-
-    public async process(context: TransactionalContext, queue: string, transaction: string) {
-
-        const [_, _source, database, collection, _target] = queue.split(':')
-        const source: ExportSource = { name: _source, database, collection }
-        const target: ExportTarget = { name: _target }
-
-        const id = { transaction, source, target }
-
-        context.logger.log('new event received:', id)
-
-        try {
-
-            const data = await this.get(id) as Export
-
-            const _temp = await this.temp(context, data)
-
-            const worker = new ExportWorker(context, data, _temp)
-
-            await worker.run()
-
-            await this.update(context, id, { status: 'success' })
-
-        } catch (error: any) {
-
-            const _message = 'fail on worker export'
-
-            context.logger.error(_message, error)
-
-            await this.update(
-                context,
-                id,
-                {
-                    status: 'error',
-                    error: {
-                        message: 'message' in error ? error.message : _message,
-                        cause: 'cause' in error ? error.cause : error
-                    }
-                }
-            )
-
-        }
-    }
-
-    private async temp(context: TransactionalContext, data: Export) {
-
-        const service = Regex.inject(TempService)
-
-        const { transaction, source, target, window } = data
-
-        const cursor = service.find({ transaction, source, target })
-
-        let temp = null
-
-        if (await cursor.hasNext()) {
-            temp = await cursor.next()
-        }
-
-        if (!ObjectHelper.has(temp)) {
-            temp = { transaction, source, target, date: window.begin, count: 0 }
-            await service.save(temp)
-        }
-
-        if ((temp?.date ?? new Date(0)).getTime() > window.begin.getTime() || (temp?.count ?? 0) > 0) {
-            context.logger.log(`${temp?.count.toLocaleString('pt-BR')} rows already inserted, resuming data ingestion from date ${temp?.date.toLocaleDateString('pt-BR')}...`)
-        }
-
-        return temp as Temp
-
-    }
 
 }

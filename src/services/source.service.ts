@@ -1,10 +1,8 @@
-import { CountOptions, FindOptions, MongoClient } from 'mongodb'
-import { BadRequestError } from '../exceptions/badrequest.error'
-import { MongoDBDocument, MongoDBHelper } from '../helpers/mongodb.helper'
-import { ObjectHelper } from '../helpers/object.helper'
+import { MongoClient } from 'mongodb'
+import { BadRequestError } from '../exceptions/bad-request.error'
+import { MongoDBDocument, MongoDBHelper, MongoDBService, MongoDBValidationInput } from '../helpers/mongodb.helper'
 import { StringHelper } from '../helpers/string.helper'
-import { Regex } from '../regex'
-import { ExportService } from './export.service'
+import { Export } from './export.service'
 import { SettingsService } from './settings.service'
 
 export interface Source extends MongoDBDocument<Source, 'name'> {
@@ -12,90 +10,53 @@ export interface Source extends MongoDBDocument<Source, 'name'> {
     url: string
 }
 
-export class SourceService {
+export type SourceCollectionsInput = Pick<Source, 'name'> & { database: Export['database'] }
 
-    public static readonly COLLECTION = 'sources'
+export class SourceService extends MongoDBService<Source, 'name'> {
 
-    public async get({ name }: Pick<Source, 'name'>) {
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const result = await MongoDBHelper.get<Source, 'name'>({ client, database, collection: SourceService.COLLECTION, id: { name } })
-        return result
-    }
+    protected get database() { return SettingsService.DATABASE }
+    public get collection() { return 'sources' }
 
-    public find(filter: Partial<Source>, options?: FindOptions<Source>) {
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const result = MongoDBHelper.find({ client, database, collection: SourceService.COLLECTION, filter, options })
-        return result
-    }
+    protected async validate({ id, document, on }: MongoDBValidationInput<Source, 'name'>) {
 
-    public async count(filter: Partial<Source>, options?: CountOptions) {
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const result = MongoDBHelper.count({ client, database, collection: SourceService.COLLECTION, filter, options })
-        return result
-    }
+        const { name } = id
+        if (StringHelper.empty(name)) {
+            throw new BadRequestError('source id is empty')
+        }
 
-    public async exists(filter: Partial<Source>, options?: CountOptions) {
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const result = MongoDBHelper.exists({ client, database, collection: SourceService.COLLECTION, filter, options })
-        return result
-    }
-
-    public async save(document: Source) {
-
-        await this.validate(document)
-
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const id = { name: document.name }
-
-        await MongoDBHelper.save({ client, database, collection: SourceService.COLLECTION, id, document })
-
-    }
-
-    public async validate(document: Source) {
-
-        if (!ObjectHelper.has(document)) {
+        const { url } = document ?? {}
+        if (StringHelper.empty(url)) {
             throw new BadRequestError('source is empty')
         }
 
-        if (StringHelper.empty(document.name)) {
-            throw new BadRequestError('source.name is empty')
-        }
-
-        if (StringHelper.empty(document.url)) {
-            throw new BadRequestError('source.url is empty')
-        }
-
-        try {
-            await new MongoClient(document.url).connect()
-        } catch (error) {
-            throw new BadRequestError(`does not possible to connect at mongodb with received url, error:`, error)
-        }
+        await this.test({ url })
 
     }
 
-    public async delete({ name }: Pick<Source, 'name'>) {
-
-        if (StringHelper.empty(name)) {
-            throw new BadRequestError(`source.name is empty`)
+    public async test({ url }: Pick<Source, 'url'>) {
+        try {
+            await new MongoClient(url as string).connect()
+        } catch (error) {
+            throw new BadRequestError(`does not possible to connect at mongodb with received url, error:`, error)
         }
+    }
 
-        const _export = Regex.inject(ExportService)
-        const count = await _export.count({ source: { name } as any })
-        if (count > 0) {
-            throw new BadRequestError(`there are ${count} exports containing source "${name}"`)
-        }
+    public async collections({ name, database }: SourceCollectionsInput) {
 
-        const client = Regex.inject(MongoClient)
-        const { database } = Regex.inject(SettingsService)
-        const id = { name }
+        const { url } = await this.get({ id: { name } }) as Source
 
-        await MongoDBHelper.delete({ client, database, collection: SourceService.COLLECTION, id })
+        const client = new MongoClient(url)
 
+        const result = await MongoDBHelper.collections({ client, database })
+
+        return result.map(({ collectionName: collection }) => ({ collection }))
+
+    }
+
+    public async connect({ name }: Pick<Source, 'name'>) {
+        const { url } = await this.get({ id: { name } }) as Source
+        const client = new MongoClient(url)
+        return client
     }
 
 }

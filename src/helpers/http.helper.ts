@@ -1,20 +1,25 @@
 import http from 'http'
 import https from 'https'
 import { HTTPIncomingMessage, HTTPServerResponse, LogMode, Logger, Regex } from '../regex'
+import { AuthHelper } from './auth.helper'
 import { ObjectHelper } from './object.helper'
 import { ResilienceHelper } from './resilience.helper'
 
-export type HTTPRequestInput<T extends 'http' | 'https'> = { logger: Logger, url: string, options: T extends 'http' ? http.RequestOptions : https.RequestOptions }
+export type HTTPRequestInput<T extends 'http' | 'https'> = { logger?: Logger, url: string, options: T extends 'http' ? http.RequestOptions : https.RequestOptions, body?: any }
 
-export type HTTPHelperIncomingInput = { message: http.IncomingMessage, logger?: Logger }
+export type HTTPHelperIncomingInput = { logger?: Logger, message: http.IncomingMessage }
+
+export type HTTPHelperHeadersInput = { authenticated: boolean, extras?: any }
 
 export class HTTPHelper {
 
-    public static incoming({ message, logger }: HTTPHelperIncomingInput): HTTPIncomingMessage {
+    public static readonly HTTP_HEADER_TRANSACTION = 'x-badger-transaction'
+
+    public static incoming({ logger, message }: HTTPHelperIncomingInput): HTTPIncomingMessage {
 
         const request = message as any as HTTPIncomingMessage
 
-        request.logger = ObjectHelper.has(logger) ? logger as Logger : Regex.register(Logger)
+        request.logger = ObjectHelper.has(logger) ? logger as Logger : Regex.register(Logger, request.headers?.[HTTPHelper.HTTP_HEADER_TRANSACTION])
         request.transaction = request.logger.transaction as string
 
         request.getURL = () => new URL(request.url as string, `http://${request.headers.host}`)
@@ -66,7 +71,7 @@ export class HTTPHelper {
         })
     }
 
-    public static async request<T extends 'http' | 'https'>({ logger, url, options }: HTTPRequestInput<T>) {
+    public static async request<T extends 'http' | 'https'>({ logger, url, options, body }: HTTPRequestInput<T>) {
 
         const type = url.startsWith('http:') ? 'http' : 'https' as T
 
@@ -74,16 +79,18 @@ export class HTTPHelper {
 
         return new Promise<HTTPIncomingMessage>((resolve, reject) => {
 
-            const __request = _request(url, options, async (message: http.IncomingMessage) => {
+            options.headers = options.headers ?? {}
+            options.headers[HTTPHelper.HTTP_HEADER_TRANSACTION] = logger?.transaction
 
-                const _message = HTTPHelper.incoming({ message, logger })
+            const __request = _request(new URL(url), options, async (message: http.IncomingMessage) => {
+
+                const _message = HTTPHelper.incoming({ logger, message })
 
                 if (!_message.ok()) {
                     const { headers } = _message
-                    const body = await _message.body()
                     const cause = {
                         request: { url, options },
-                        response: { headers, body }
+                        response: { headers, body: await _message.body() }
                     }
                     reject(new Error(`${_message.statusCode} - ${_message.statusMessage} at ${url}`, { cause }))
                     return
@@ -92,11 +99,24 @@ export class HTTPHelper {
                 resolve(_message)
 
             })
-
             __request.on('error', reject)
+
+            if (ObjectHelper.has(body)) {
+                __request.write(JSON.stringify(body))
+            }
+
             __request.end()
-            
+
         })
 
     }
+
+    public static headers({ authenticated, extras }: HTTPHelperHeadersInput) {
+        const auth = authenticated ? AuthHelper.header() : {}
+        return {
+            ...extras,
+            ...auth
+        }
+    }
+
 }
