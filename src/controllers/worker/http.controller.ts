@@ -5,6 +5,7 @@ import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController, Tr
 import { ExportTaskService, ExportTaskStateChangeInput } from '../../services/export.task.service'
 import { Source, SourceService } from '../../services/source.service'
 import { Target, TargetService } from '../../services/target.service'
+import { WorkerService } from '../../services/worker.service'
 
 export class WorkerHTTPController implements RegexHTTPController {
 
@@ -35,8 +36,11 @@ async function read(request: HTTPIncomingMessage): Promise<ExportTaskStateChange
 
     await _validate(request, id)
 
+    const service = Regex.inject(WorkerService)
+    const document = { worker: service.name() }
+
     const { transaction, source, target, database, collection } = id
-    return { context: request, id: { transaction, source, target, database, collection } }
+    return { context: request, id: { transaction, source, target, database, collection }, document }
 
 }
 
