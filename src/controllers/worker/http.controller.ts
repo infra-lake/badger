@@ -31,7 +31,7 @@ export class WorkerHTTPController implements RegexHTTPController {
 async function read(request: HTTPIncomingMessage): Promise<ExportTaskStateChangeInput> {
 
     const id = await request.json<ExportTaskStateChangeInput['id']>()
-    id.transaction = request.transaction
+    request.transaction = id.transaction
 
     await _validate(request, id)
 
