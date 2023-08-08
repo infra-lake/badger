@@ -380,10 +380,13 @@ export class ExportTaskService extends MongoDBService<ExportTask, 'transaction' 
 
             const service = Regex.inject(ExportService)
             const { transaction, source, target, database } = id
+
+            console.debug("ExportTaskService.test(id):", id)
+
             const document = await service.get({ id: { transaction, source, target, database } })
 
             if (!ObjectHelper.has(document)) {
-                throw new Error('expport does not found')
+                throw new Error('export does not found')
             }
 
         } catch (error) {
