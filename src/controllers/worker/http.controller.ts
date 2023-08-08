@@ -19,9 +19,8 @@ export class WorkerHTTPController implements RegexHTTPController {
 
         const service = Regex.inject(ExportTaskService)
 
-        const output = await service.start(input)
+        await service.start(input)
 
-        response.write(JSON.stringify(output))
         response.setStatusCode(200)
         response.end()
 
