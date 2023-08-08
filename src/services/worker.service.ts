@@ -87,7 +87,7 @@ export class WorkerService {
         const result = workers.map(worker => {
             const status: WorkerStatus = busy.filter(({ name }) => worker.name === name).length > 0 ? 'busy' : 'free'
             return { ...worker, status }
-        }).filter(worker => worker.status === status)
+        }).filter(worker => StringHelper.empty(status) || worker.status === status)
 
         return result
 
