@@ -19,7 +19,8 @@ type WorkerRowInput = { chunk: any, date: Date }
 
 export class WorkerBatchController implements RegexBatchController {
 
-    private limits: ExportTaskStatisticsLimits = { count: 3000, bytes: bytes('13MB') }
+    // bigquery bytes limit docs: https://cloud.google.com/bigquery/quotas#streaming_inserts
+    private limits: ExportTaskStatisticsLimits = { bytes: bytes('10MB') }
 
     public get settings(): BatchSettings { return {} }
 
@@ -30,9 +31,11 @@ export class WorkerBatchController implements RegexBatchController {
     public async handle(message: BatchIncomingMessage): Promise<void> {
 
         const task = await this.next({ context: message }) as ExportTaskServiceNextOutput
+        
+        if (!ObjectHelper.has(task)) { return }
 
         let attempt = 0
-        const attempts = 5
+        const attempts = 1
         let again = false
 
         do {
@@ -45,13 +48,32 @@ export class WorkerBatchController implements RegexBatchController {
 
                 message.logger.log('attempt', attempt, 'of', attempts, 'attempts...')
 
-                await this.perform({ context: message, task })
+                const increase = await this.perform({ context: message, task })
+
+                if (increase) {
+                    const from = this.limits.bytes
+                    const to = Math.floor(this.limits.bytes * 1.1)
+                    this.limits.bytes = to
+                    message.logger.error('increasing bytes limit from', bytes(from), 'bytes to', bytes(to), 'bytes')
+                }
 
                 again = false
 
                 message.logger.log('attempt', attempt, 'successfully finished')
 
             } catch (error) {
+
+                if (this.isTooLarge(error)) {
+
+                    const from = this.limits.bytes
+                    const to = Math.floor(this.limits.bytes * 0.9)
+                    this.limits.bytes = to
+                    message.logger.error('too large error at attempt', attempt, 'decreasing bytes limit from', bytes(from), 'bytes to', bytes(to), 'bytes')
+
+                    attempt--
+                    again = true
+                    continue
+                }
 
                 message.logger.error('error at attempt', attempt, ':', error)
 
@@ -69,6 +91,10 @@ export class WorkerBatchController implements RegexBatchController {
 
         } while (again)
 
+    }
+
+    private isTooLarge(error: any) {
+        return (error?.code ?? 0) === 413
     }
 
     public async shutdown(context: TransactionalContext): Promise<void> {
@@ -92,12 +118,10 @@ export class WorkerBatchController implements RegexBatchController {
 
     private async perform({ context, task }: WorkRunInut) {
 
-        if (!ObjectHelper.has(task)) { return }
-
         let count = await task.source.count()
         if (count <= 0) {
             await task.finish((task.count ?? 0))
-            return
+            return false
         }
 
         context.logger.log('starting export task "', JSON.parse(task.name()), '" at "', context.date.toISOString(), '"')
@@ -124,6 +148,8 @@ export class WorkerBatchController implements RegexBatchController {
 
         context.logger.log(`exported was successfully finished`)
 
+        return true
+
     }
 
     private row({ chunk, date }: WorkerRowInput) {
@@ -140,8 +166,9 @@ export class WorkerBatchController implements RegexBatchController {
 
     }
 
-    private flush({ remaining: total, rows }: WorkerFlushInput) {
-        return rows.length > 0 && (total <= 0 || (total % this.limits.count) === 0 || ExportHelper.bytes(rows) > this.limits.bytes)
+    private flush({ remaining, rows }: WorkerFlushInput) {
+        const bytes = ExportHelper.bytes(rows)
+        return rows.length > 0 && (remaining <= 0 || bytes > this.limits.bytes)
     }
 
     private async insert({ context, task, rows, statistics }: WorkerInsertInput) {

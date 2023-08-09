@@ -6,7 +6,7 @@ export type ExportTaskStatisticsRemaining = { count: number }
 export type ExportTaskStatisticsIngested = { count: number, bytes: number, percent: number }
 export type ExportTaskStatisticsCurrent = { count: number, bytes: number }
 export type ExportTaskStatisticsUpdateInput = { rows: any[], task: Pick<ExportTaskServiceNextOutput, 'count'> }
-export type ExportTaskStatisticsLimits = { count: number, bytes: number }
+export type ExportTaskStatisticsLimits = { bytes: number }
 
 export class ExportTaskStatistics {
 
@@ -47,8 +47,7 @@ export class ExportTaskStatistics {
             percent: ((task.count ?? 0) / total) * 100
         }
 
-        // bigquery bytes limit docs: https://cloud.google.com/bigquery/quotas#streaming_inserts
-        const broken = (__current.bytes > this.limits.bytes) || (__current.count > this.limits.bytes)
+        const broken = (__current.bytes > this.limits.bytes)
 
         return {
             current: __current,
@@ -87,7 +86,8 @@ export class ExportHelper {
     private constructor() { }
 
     public static bytes(rows: any[]) {
-        return rows.map(sizeof).reduce((sum, value) => sum + value, 0)
+        const result = rows.map(sizeof).reduce((sum, value) => sum + value, 0)
+        return result
     }
 
 }

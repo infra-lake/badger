@@ -37,7 +37,12 @@ async function read(request: HTTPIncomingMessage): Promise<ManagerCommandExportH
     const method = pathname.split('/')[2] as ManagerCommandExportHTTPControllerInput['method']
 
     const id = await request.json<ExportStateChangeInput['id']>()
-    id.transaction = request.transaction
+    
+    if (['stop', 'retry'].includes(method)) {
+        request.transaction = id.transaction
+    } else {
+        id.transaction = request.transaction
+    }
 
     await _validate(request, id)
 
