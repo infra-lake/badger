@@ -2,12 +2,13 @@ import { NotFoundError } from '../../exceptions/not-found.error'
 import { AuthHelper } from '../../helpers/auth.helper'
 import { QueryStringHelper } from '../../helpers/querystring.helper'
 import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController } from '../../regex'
+import { ExportTaskService } from '../../services/export.task.service'
 import { Source, SourceService } from '../../services/source.service'
 import { Target, TargetService } from '../../services/target.service'
 
 export class ManagerHTTPController implements RegexHTTPController {
 
-    public static readonly path = '^/(source|target)$'
+    public static readonly path = '^/(source|target|task)$'
 
     public async post(request: HTTPIncomingMessage, response: HTTPServerResponse) {
 
@@ -53,6 +54,7 @@ export class ManagerHTTPController implements RegexHTTPController {
         switch (type) {
             case 'source': service = Regex.inject(SourceService); break
             case 'target': service = Regex.inject(TargetService); break
+            case 'task': service = Regex.inject(ExportTaskService); break
             default: throw new NotFoundError(type)
         }
 

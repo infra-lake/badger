@@ -229,7 +229,7 @@ export class ExportService extends MongoDBService<Export, 'transaction' | 'sourc
     public async retry({ context, id }: ExportStateChangeInput) {
 
         if (![ApplicationMode.MANAGER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
-            throw new UnsupportedOperationError(`${ExportService.name}.error()`)
+            throw new UnsupportedOperationError(`${ExportService.name}.retry()`)
         }
 
         context?.logger.log('changing state of export to created...')
@@ -255,7 +255,7 @@ export class ExportService extends MongoDBService<Export, 'transaction' | 'sourc
             throw new Error('does not possible update export to created because export is not found')
         }
 
-        if (((result.value?.status as Export['status']) !== 'error')) {
+        if (((result.value?.status as Export['status']) !== 'created')) {
             throw new Error('does not possible update export to created')
         }
 
