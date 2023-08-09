@@ -35,7 +35,7 @@ export class WorkerBatchController implements RegexBatchController {
         if (!ObjectHelper.has(task)) { return }
 
         let attempt = 0
-        const attempts = 1
+        const attempts = 5
         let again = false
 
         do {
