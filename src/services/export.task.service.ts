@@ -135,6 +135,8 @@ export class ExportTaskService extends MongoDBService<ExportTask, 'transaction' 
             })
 
             if (!response.ok()) {
+                const body = await response.body()
+                context.logger.error(body)
                 throw new BadRequestError(`${response.statusCode} - ${response.statusMessage}`)
             }
 

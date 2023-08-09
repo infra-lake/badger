@@ -17,6 +17,7 @@ export class VoterBatchController implements RegexBatchController {
 
         const workers = Regex.inject(WorkerService)
         const free = await workers.list({ context: message, filter: { status: 'free' } })
+        message.logger.log('free workers:', JSON.stringify(free))
 
         if (free.length <= 0) { return }
 
@@ -26,7 +27,9 @@ export class VoterBatchController implements RegexBatchController {
         const cursor1 = tasks.find({ context: message, filter: { status: 'created' } })
         if (await cursor1.hasNext()) {
             const { transaction, source, target, database, collection } = await cursor1.next() as ExportTask
-            const worker = free[Math.floor(Math.random() * free.length)].name
+            const index = Math.floor(Math.random() * free.length)
+            message.logger.log('sorted worker index:', index)
+            const worker = free[index].name
             await tasks.start({ context: message, id: { transaction, source, target, database, collection }, document: { worker } })
             const created = await exports.exists({ filter: { transaction, source, target, database, status: 'created' } })
             if (created) {
