@@ -9,8 +9,8 @@ import { HTTPHelper } from '../helpers/http.helper'
 import { QueryStringHelper } from '../helpers/querystring.helper'
 import { StringHelper } from '../helpers/string.helper'
 import { Regex, TransactionalContext } from '../regex'
-import { ExportTaskService } from './export.task.service'
 import { UnsupportedOperationError } from '../exceptions/unsupported-operation.error'
+import { ExportTaskService } from './export/task/service'
 
 export interface Worker {
     name: string
@@ -48,31 +48,7 @@ export class WorkerService {
 
         const { name, status } = filter ?? {}
 
-        if ([ApplicationMode.MANAGER, ApplicationMode.WORKER].includes(ApplicationHelper.MODE)) {
-
-            const qs = QueryStringHelper.stringify({ name, status }, 'qs')
-            const url = `${EnvironmentHelper.get('VOTER_URL')}/worker${StringHelper.empty() ? '' : `?${qs}`}`
-
-            const options: RequestOptions = {
-                method: 'GET',
-                headers: HTTPHelper.headers({ authenticated: true })
-
-            }
-
-            const response = await HTTPHelper.request({
-                logger: context.logger,
-                url,
-                options
-            })
-
-            if (!response.ok()) {
-                throw new BadRequestError(`${response.statusCode} - ${response.statusMessage}`)
-            }
-
-            const result = await response.json<WorkerServiceListOutput>()
-            return result
-
-        }
+        
 
         const workers = this.workers.filter(worker =>
             StringHelper.empty(name) ||
@@ -134,5 +110,7 @@ export class WorkerService {
         }
 
     }
+
+    
 
 }

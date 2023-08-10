@@ -3,7 +3,7 @@ import { QueryStringHelper } from '../../helpers/querystring.helper'
 import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController } from '../../regex'
 import { WorkerService } from '../../services/worker.service'
 
-export class ViterHTTPController implements RegexHTTPController {
+export class VoterHTTPController implements RegexHTTPController {
 
     public static readonly path = '^/worker$'
 
@@ -11,7 +11,10 @@ export class ViterHTTPController implements RegexHTTPController {
 
         if (!AuthHelper.validate(request, response)) { return }
 
-        const input = read(request)
+        const { searchParams } = request.getURL()
+        const { filter = {} } = QueryStringHelper.parse(searchParams)
+        const { name, status } = filter ?? {}
+        const input = { context: request, filter: { name, status } }
 
         const service = Regex.inject(WorkerService)
 
@@ -23,11 +26,4 @@ export class ViterHTTPController implements RegexHTTPController {
 
     }
 
-}
-
-function read(request: HTTPIncomingMessage) {
-    const { searchParams } = request.getURL()
-    const { filter = {} } = QueryStringHelper.parse(searchParams)
-    const { name, status } = filter ?? {}
-    return { context: request, filter: { name, status } }
 }

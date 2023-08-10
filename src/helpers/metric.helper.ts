@@ -8,16 +8,9 @@ export class MetricHelper {
     private static _http_received_request_total = new Counter({
         name: 'http_received_request_total',
         help: 'Total of Received HTTP Requests',
-        labelNames: [ 'path', 'status' ]
+        labelNames: [ 'method', 'path', 'status' ]
     })
     public static get http_received_request_total() { return MetricHelper._http_received_request_total }
-
-    private static _rabbitmq_received_message_total = new Counter({
-        name: 'rabbitmq_received_message_total',
-        help: 'Total of Received RabbitMQ AMQP Messages',
-        labelNames: [ 'queue', 'status' ]
-    })
-    public static get rabbitmq_received_message_total() { return MetricHelper._rabbitmq_received_message_total }
 
     private static _service_exponential_backoff_total = new Gauge({
         name: 'service_exponential_backoff_total',

@@ -2,25 +2,23 @@ import { BigQueryTimestamp } from '@google-cloud/bigquery'
 import bytes from 'bytes'
 import { createHash } from 'crypto'
 import { DeserializationHelper } from '../../helpers/deserialization.helper'
-import { ExportHelper, ExportTaskStatistics, ExportTaskStatisticsLimits } from '../../helpers/export.task.helper'
 import { ObjectHelper } from '../../helpers/object.helper'
 import { StampsHelper } from '../../helpers/stamps.helper'
 import { ThreadHelper } from '../../helpers/thread.helper'
+import { ExportHelper, WorkloadLimits, WorkloadStatistics } from '../../helpers/workload.helper'
 import { Regex, TransactionalContext } from '../../regex'
 import { BatchIncomingMessage, BatchSettings, RegexBatchController } from '../../regex/batch'
-import { ExportTaskService, ExportTaskServiceNextOutput } from '../../services/export.task.service'
-import { WorkerService } from '../../services/worker.service'
+import { Workload, WorkloadService } from '../../services/workload.service'
 
-type NextInput = { context: BatchIncomingMessage }
-type WorkRunInut = { context: BatchIncomingMessage, task: ExportTaskServiceNextOutput }
+type WorkerPerformInput = { context: BatchIncomingMessage, workload: Workload }
 type WorkerFlushInput = { remaining: number, rows: any[] }
-type WorkerInsertInput = { context: TransactionalContext, task: ExportTaskServiceNextOutput, rows: any[], statistics: ExportTaskStatistics }
+type WorkerInsertInput = { context: TransactionalContext, workload: Workload, rows: any[], statistics: WorkloadStatistics }
 type WorkerRowInput = { chunk: any, date: Date }
 
 export class WorkerBatchController implements RegexBatchController {
 
     // bigquery bytes limit docs: https://cloud.google.com/bigquery/quotas#streaming_inserts
-    private limits: ExportTaskStatisticsLimits = { bytes: bytes('10MB') }
+    private limits: WorkloadLimits = { bytes: bytes('10MB') }
 
     public get settings(): BatchSettings { return {} }
 
@@ -30,9 +28,10 @@ export class WorkerBatchController implements RegexBatchController {
 
     public async handle(message: BatchIncomingMessage): Promise<void> {
 
-        const task = await this.next({ context: message }) as ExportTaskServiceNextOutput
-        
-        if (!ObjectHelper.has(task)) { return }
+        const workloads = Regex.inject(WorkloadService)
+        const workload = await workloads.next(message) as Workload
+
+        if (!ObjectHelper.has(workload)) { return }
 
         let attempt = 0
         const attempts = 5
@@ -48,14 +47,7 @@ export class WorkerBatchController implements RegexBatchController {
 
                 message.logger.log('attempt', attempt, 'of', attempts, 'attempts...')
 
-                const increase = await this.perform({ context: message, task })
-
-                if (increase) {
-                    const from = this.limits.bytes
-                    const to = Math.floor(this.limits.bytes * 1.1)
-                    this.limits.bytes = to
-                    message.logger.error('increasing bytes limit from', bytes(from), 'bytes to', bytes(to), 'bytes')
-                }
+                await this.perform({ context: message, workload })
 
                 again = false
 
@@ -63,25 +55,13 @@ export class WorkerBatchController implements RegexBatchController {
 
             } catch (error) {
 
-                if (this.isTooLarge(error)) {
-
-                    const from = this.limits.bytes
-                    const to = Math.floor(this.limits.bytes * 0.9)
-                    this.limits.bytes = to
-                    message.logger.error('too large error at attempt', attempt, 'decreasing bytes limit from', bytes(from), 'bytes to', bytes(to), 'bytes')
-
-                    attempt--
-                    again = true
-                    continue
-                }
-
                 message.logger.error('error at attempt', attempt, ':', error)
 
                 if (again) {
                     await ThreadHelper.sleep(2000 * Math.pow(2, attempt))
                 } else {
                     try {
-                        await task.error(task.count, error)
+                        await workload.error(error)
                     } catch (error) {
                         message.logger.error('another error at attempt', attempt, ':', error)
                     }
@@ -101,35 +81,19 @@ export class WorkerBatchController implements RegexBatchController {
 
     }
 
-    private async next({ context }: NextInput) {
+    private async perform({ context, workload }: WorkerPerformInput) {
 
-        const workers = Regex.inject(WorkerService)
-        const tasks = Regex.inject(ExportTaskService)
-
-        const task = await tasks.next({ context, worker: workers.name() }) as ExportTaskServiceNextOutput
-
-        if (!ObjectHelper.has(task)) {
-            return undefined
-        }
-
-        return task
-
-    }
-
-    private async perform({ context, task }: WorkRunInut) {
-
-        let count = await task.source.count()
+        let count = await workload.source.count()
         if (count <= 0) {
-            await task.finish((task.count ?? 0))
-            return false
+            await workload.finish()
         }
 
-        context.logger.log('starting export task "', JSON.parse(task.name()), '" at "', context.date.toISOString(), '"')
+        context.logger.log('starting export task "', JSON.parse(workload.name), '" at "', context.date.toISOString(), '"')
 
-        const statistics = new ExportTaskStatistics(task, this.limits, count)
+        const statistics = new WorkloadStatistics(workload, this.limits, count)
 
         let rows: any[] = []
-        const cursor = task.source.find()
+        const cursor = workload.source.find()
         while (await cursor.hasNext()) {
 
             const chunk = await cursor.next()
@@ -139,12 +103,12 @@ export class WorkerBatchController implements RegexBatchController {
             rows.push(row)
 
             if (this.flush({ remaining: --count, rows })) {
-                rows = await this.insert({ context, task, rows, statistics })
+                rows = await this.insert({ context, workload: workload, rows, statistics })
             }
 
         }
 
-        await task.finish(task.count)
+        await workload.finish()
 
         context.logger.log(`exported was successfully finished`)
 
@@ -171,9 +135,9 @@ export class WorkerBatchController implements RegexBatchController {
         return rows.length > 0 && (remaining <= 0 || bytes > this.limits.bytes)
     }
 
-    private async insert({ context, task, rows, statistics }: WorkerInsertInput) {
+    private async insert({ context, workload, rows, statistics }: WorkerInsertInput) {
 
-        const { count } = task
+        const { count } = workload
         const included = rows
         const excluded = [] as WorkerInsertInput['rows']
 
@@ -184,14 +148,11 @@ export class WorkerBatchController implements RegexBatchController {
         const date = included[included.length - 1][StampsHelper.DEFAULT_STAMP_UPDATE]
         included.forEach(row => delete row[StampsHelper.DEFAULT_STAMP_UPDATE])
 
-        await task.target.table.temporary.insert(included)
+        await workload.target.table.temporary.insert(included)
 
-        task.count = (task.count ?? 0) + included.length
-        task.date = date
+        await workload.update(date, count + included.length)
 
-        await task.update(date, task.count ?? 0)
-
-        statistics.update({ rows: included, task })
+        statistics.update({ rows: included, task: workload })
         context.logger.log(`flushing ${statistics}...`)
 
         return excluded

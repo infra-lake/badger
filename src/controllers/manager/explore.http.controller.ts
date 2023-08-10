@@ -7,7 +7,7 @@ import { Stamps, StampsHelper } from '../../helpers/stamps.helper'
 import { StreamHelper } from '../../helpers/stream.helper'
 import { Window, WindowHelper } from '../../helpers/window.helper'
 import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController } from '../../regex'
-import { ExportService } from '../../services/export.service'
+import { ExportService } from '../../services/export/service'
 import { Source, SourceService } from '../../services/source.service'
 
 export class ManagerExploreHTTPController implements RegexHTTPController {
@@ -16,9 +16,7 @@ export class ManagerExploreHTTPController implements RegexHTTPController {
 
     public async get(request: HTTPIncomingMessage, response: HTTPServerResponse) {
 
-        if (!AuthHelper.validate(request, response)) {
-            return
-        }
+        if (!AuthHelper.validate(request, response)) { return }
 
         const input = await _input(request)
         const filter = _filter(input)
@@ -26,7 +24,7 @@ export class ManagerExploreHTTPController implements RegexHTTPController {
 
         let count = 0
 
-        await _find(input, filter)
+        _find(input, filter)
             .on('resume', () => {
                 response.setHeader('Content-Type', 'application/json')
                 response.write(`{ "metadata": ${metadata}, "results": [`)

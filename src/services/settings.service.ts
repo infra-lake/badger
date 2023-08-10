@@ -1,10 +1,10 @@
 import { MongoClient } from 'mongodb'
 import { EnvironmentHelper } from '../helpers/environment.helper'
-import { Regex, RegexApplication } from '../regex'
-import { ExportService } from './export.service'
+import { Regex } from '../regex'
+import { ExportService } from './export/service'
+import { ExportTaskService } from './export/task/service'
 import { SourceService } from './source.service'
 import { TargetService } from './target.service'
-import { ExportTaskService } from './export.task.service'
 
 export class SettingsService {
 

@@ -1,3 +1,4 @@
+import { ObjectHelper } from "./object.helper"
 
 export class DateHelper {
 
@@ -22,6 +23,10 @@ export class DateHelper {
         const date = value.toISOString()
         const result = `${date.substring(0, date.length - 1)}000Z`
         return result
+    }
+
+    public static valid(value?: Date) {
+        return ObjectHelper.has(value) && value instanceof Date && !isNaN(value as any)
     }
 
 }

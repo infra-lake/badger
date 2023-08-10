@@ -1,9 +1,13 @@
-import { MongoClient } from 'mongodb'
+import { AggregateOptions, AggregationCursor, MongoClient } from 'mongodb'
 import { BadRequestError } from '../exceptions/bad-request.error'
 import { MongoDBDocument, MongoDBHelper, MongoDBService, MongoDBValidationInput } from '../helpers/mongodb.helper'
 import { StringHelper } from '../helpers/string.helper'
-import { Export } from './export.service'
+import { Export, ExportService } from './export/service'
 import { SettingsService } from './settings.service'
+import { BatchIncomingMessage } from '../regex/batch'
+import { ExportTask } from './export/task/service'
+import { Regex } from '../regex'
+import { StampsHelper } from '../helpers/stamps.helper'
 
 export interface Source extends MongoDBDocument<Source, 'name'> {
     name: string
@@ -11,6 +15,13 @@ export interface Source extends MongoDBDocument<Source, 'name'> {
 }
 
 export type SourceCollectionsInput = Pick<Source, 'name'> & { database: Export['database'] }
+
+export type SourceInput = { context: BatchIncomingMessage, task: ExportTask }
+export type SourceOutput = {
+    name: string
+    count: () => Promise<number>
+    find: () => AggregationCursor<Source>
+}
 
 export class SourceService extends MongoDBService<Source, 'name'> {
 
@@ -57,6 +68,67 @@ export class SourceService extends MongoDBService<Source, 'name'> {
         const { url } = await this.get({ id: { name } }) as Source
         const client = new MongoClient(url)
         return client
+    }
+
+    public async source({ context, task }: SourceInput): Promise<SourceOutput> {
+
+        const { source, target, database, collection, date } = task
+
+        const sources = Regex.inject(SourceService)
+        const client = await sources.connect({ name: source })
+
+        const window = {
+            begin: date ?? await this.last({ source, target, database, collection }),
+            end: context.date
+        }
+
+        const filter = ExportService.filter(window)
+
+        const count = async () => {
+            const count = await MongoDBHelper.count({ client, database, collection, filter })
+            if (count <= 0) {
+                context.logger.log('there aren\'t rows to export')
+            } else {
+                context.logger.log(`exporting ${count.toLocaleString('pt-BR')} row(s)...`)
+            }
+            return count
+        }
+
+        const find = () => {
+            const options: AggregateOptions = { allowDiskUse: true }
+            return client.db(database).collection(collection).aggregate<Source>([
+                { $addFields: { temporary: 1, [StampsHelper.DEFAULT_STAMP_UPDATE]: filter['$expr']['$and'][0]['$gt'][0] } },
+                { $addFields: { match: filter['$expr'] } },
+                { $project: { temporary: 0 } },
+                { $match: { match: true } },
+                { $project: { match: 0 } },
+                { $sort: { [StampsHelper.DEFAULT_STAMP_UPDATE]: 1 } }
+            ], options)
+        }
+
+        return { name: source, count, find }
+
+    }
+
+    private async last({ source, target, database, collection }: Pick<ExportTask, 'source' | 'target' | 'database' | 'collection'>): Promise<Date> {
+
+        const cursor = this._collection.aggregate([
+            { $match: { source, target, database, collection, status: 'terminated' } },
+            {
+                $group: {
+                    _id: { source: "$source", target: "$target", database: "$database", collection: "$collection" },
+                    value: { $max: "$date" }
+                }
+            }
+        ])
+
+        if (await cursor.hasNext()) {
+            const { value } = await cursor.next() as any;
+            return value
+        }
+
+        return new Date(0)
+
     }
 
 }

@@ -1,7 +1,7 @@
+import { VoterHTTPClient } from '../../clients/voter.http.client'
 import { AuthHelper } from '../../helpers/auth.helper'
 import { QueryStringHelper } from '../../helpers/querystring.helper'
 import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController } from '../../regex'
-import { WorkerService } from '../../services/worker.service'
 
 export class ManagerWorkerHTTPController implements RegexHTTPController {
 
@@ -11,11 +11,13 @@ export class ManagerWorkerHTTPController implements RegexHTTPController {
 
         if (!AuthHelper.validate(request, response)) { return }
 
-        const input = read(request)
+        const { searchParams } = request.getURL()
+        const { filter = {} } = QueryStringHelper.parse(searchParams)
+        const { name, status } = filter ?? {}
+        const input = { context: request, filter: { name, status } }
 
-        const service = Regex.inject(WorkerService)
-
-        const output = await service.list(input)
+        const client = Regex.inject(VoterHTTPClient)
+        const output = await client.workers(input)
 
         response.write(JSON.stringify(output))
         response.setStatusCode(200)
@@ -23,11 +25,4 @@ export class ManagerWorkerHTTPController implements RegexHTTPController {
 
     }
 
-}
-
-function read(request: HTTPIncomingMessage) {
-    const { searchParams } = request.getURL()
-    const { filter = {} } = QueryStringHelper.parse(searchParams)
-    const { name, status } = filter ?? {}
-    return { context: request, filter: { name, status } }
 }

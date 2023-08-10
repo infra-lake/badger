@@ -1,9 +1,11 @@
 import { VoterBatchController } from './controllers/voter/batch.controller'
+import { VoterHTTPController } from './controllers/voter/http.controller'
 import { ApplicationHelper } from './helpers/application.helper'
 import { Regex, RegexApplication, StartupInput } from './regex'
 import { SettingsService } from './services/settings.service'
 
 Regex.controller(VoterBatchController)
+Regex.controller(VoterHTTPController)
 
 export async function startup({ logger, http, batch }: StartupInput) {
 

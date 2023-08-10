@@ -26,7 +26,7 @@ export class HTTPHelper {
         request.body = async () => {
             const body = await HTTPHelper.body(request)
             if (request.logger.mode === LogMode.DEBUG) {
-                request.logger.debug('received request body:', { body })
+                request.logger.debug('received body:', { body })
             }
             return body
         }
@@ -38,7 +38,7 @@ export class HTTPHelper {
 
         if (request.logger.mode === LogMode.DEBUG) {
             const { headers } = request
-            request.logger.debug('received request headers:', { headers })
+            request.logger.debug('received headers:', { headers })
         }
 
         return request

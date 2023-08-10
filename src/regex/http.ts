@@ -46,13 +46,16 @@ async function listener(request: IncomingMessage, response: ServerResponse) {
     const _request = HTTPHelper.incoming({ message: request })
     const _response = HTTPHelper.response(response)
 
+    const { pathname, searchParams } = _request.getURL()
+    const method = _request.method?.toLocaleLowerCase()
+
     try {
 
-        _request.logger.log('call', _request.getURL().pathname)
+        _request.logger.log('call', method, 'on', pathname, searchParams.toString())
         MetricHelper.http_received_request_total.inc()
-        MetricHelper.http_received_request_total.inc({ path: _request.getURL().pathname })
+        MetricHelper.http_received_request_total.inc({ path: pathname })
 
-        if (_request.getURL().pathname === '/') {
+        if (pathname === '/') {
 
             if (!AuthHelper.validate(_request, _response)) {
                 return
@@ -66,15 +69,13 @@ async function listener(request: IncomingMessage, response: ServerResponse) {
 
         }
 
-        const controller = Regex.inject<RegexHTTPController>(_request.getURL().pathname)
+        const controller = Regex.inject<RegexHTTPController>(pathname)
 
         if (!controller) {
             const controller = Regex.inject<NotFoundController>('404')
             await controller.handle(_request, _response)
             return
         }
-
-        const method = _request.method?.toLocaleLowerCase()
 
         if (!ObjectHelper.has(method)) {
             const controller = Regex.inject<NotFoundController>('404')
@@ -113,8 +114,7 @@ async function listener(request: IncomingMessage, response: ServerResponse) {
     } catch (error) {
         ControllerHelper.catch(_request, _response, error)
     } finally {
-        MetricHelper.http_received_request_total.inc({ status: _response.statusCode })
-        MetricHelper.http_received_request_total.inc({ path: _request.getURL().pathname, status: _response.statusCode })
+        MetricHelper.http_received_request_total.inc({ method, path: pathname, status: _response.statusCode })
         Regex.unregister(_request.logger)
     }
 

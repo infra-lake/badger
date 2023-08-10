@@ -1,4 +1,4 @@
-import { Export } from '../services/export.service'
+import { Export } from '../services/export/service'
 import { BadRequestError } from './bad-request.error'
 
 export type InvalidStateChangeErrorInputStatus = {
