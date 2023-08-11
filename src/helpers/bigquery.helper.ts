@@ -25,7 +25,8 @@ export class BigQueryHelper {
 
         if (!exists && create) {
             context.logger.debug('dataset', name, 'not exists on bigquery, creating dataset...')
-            try { await result.create() } catch (error) { }
+            try { await result.create() } 
+            catch (error) { context.logger.error('error', error) }
             ThreadHelper.sleep(1000)
             return await BigQueryHelper.dataset({ context, client, name, create })
         } else if (!exists) {
@@ -57,12 +58,14 @@ export class BigQueryHelper {
         try {
             exists = (await result.exists())[0]
         } catch (error) {
+            context.logger.error('error', error)
             exists = false
         }
 
         if (!exists && create) {
             context.logger.debug('table', table, 'on dataset', _dataset, 'not exists on bigquery, creating table...')
-            try { await result.create({ schema: table.fields }) } catch (error) { }
+            try { await result.create({ schema: table.fields }) } 
+            catch (error) { context.logger.error('error', error) }
             ThreadHelper.sleep(1000)
             return await BigQueryHelper.table({ context, client, dataset: _dataset, table, create })
 
