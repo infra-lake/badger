@@ -5,22 +5,22 @@ export enum ApplicationMode {
     MANAGER = 'manager',
     WORKER = 'worker',
     VOTER = 'voter',
-    MONOLITH= 'monolith'
+    MONOLITH = 'monolith'
 }
 
 export class ApplicationHelper {
 
     public static get MODE() {
         return (ApplicationMode as any)[EnvironmentHelper.get('MODE', 'WORKER').toUpperCase()] as ApplicationMode
-    } 
+    }
 
     public static get PORT(): number {
         return parseInt(EnvironmentHelper.get('PORT', '4000'))
     }
 
     public static get IGNORE() {
-        
-        const COLLECTIONS = 
+
+        const COLLECTIONS =
             EnvironmentHelper.get('IGNORE_COLLECTIONS', '')
                 .trim()
                 .split(',')
@@ -28,12 +28,12 @@ export class ApplicationHelper {
                 .filter(stream => stream)
 
         return { COLLECTIONS }
-    
+
     }
 
     public static paths() {
         const controllers = Regex.controllers()
-        const results = 
+        const results =
             controllers
                 .map(({ constructor }) => constructor)
                 .map(({ path }) => ({ path }))

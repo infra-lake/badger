@@ -58,11 +58,13 @@ export class WorkerService {
 
         const busy = await task.busy()
 
-        const result = workers.map(worker => {
+        const temp = workers.map(worker => {
             const status: WorkerStatus = busy.filter(({ name }) => worker.name === name).length > 0 ? 'busy' : 'free'
             return { ...worker, status }
-        }).filter(worker => StringHelper.empty(status) || worker.status === status)
+        })
 
+        const result = StringHelper.empty(status) ? temp : temp.filter(worker => worker.status === status)
+        
         return result
 
     }

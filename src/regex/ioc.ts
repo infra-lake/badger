@@ -40,7 +40,7 @@ export class Regex {
         const text: string =
             typeof key === 'string'
                 ? key
-                : (key as any)[RegexField.REGEX]
+                : (key as any)[RegexField.REGEX] ?? key.name
 
         const instances =
             Object

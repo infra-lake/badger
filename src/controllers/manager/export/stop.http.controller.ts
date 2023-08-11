@@ -1,6 +1,6 @@
 import { AuthHelper } from '../../../helpers/auth.helper'
 import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController } from '../../../regex'
-import { ExportErrorInput, ExportErrorService } from '../../../services/export/error.service'
+import { ExportStopInput, ExportStopService } from '../../../services/export/stop.service'
 
 export class ManagerExportStopHTTPController implements RegexHTTPController {
 
@@ -10,7 +10,7 @@ export class ManagerExportStopHTTPController implements RegexHTTPController {
 
         if (!AuthHelper.validate(request, response)) { return }
 
-        const body = await request.json<ExportErrorInput['id']>()
+        const body = await request.json<ExportStopInput['id']>()
 
         request.transaction = body.transaction
 
@@ -18,7 +18,7 @@ export class ManagerExportStopHTTPController implements RegexHTTPController {
         const id = { transaction, source, target, database }
         const input = { context: request, id }
 
-        const service = Regex.inject(ExportErrorService)
+        const service = Regex.inject(ExportStopService)
         await service.apply(input)
 
         response.write(JSON.stringify({ transaction: body.transaction }))

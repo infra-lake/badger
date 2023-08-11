@@ -3,7 +3,6 @@ import https from 'https'
 import { HTTPIncomingMessage, HTTPServerResponse, LogMode, Logger, Regex } from '../regex'
 import { AuthHelper } from './auth.helper'
 import { ObjectHelper } from './object.helper'
-import { ResilienceHelper } from './resilience.helper'
 
 export type HTTPRequestInput<T extends 'http' | 'https'> = { logger?: Logger, url: string, options: T extends 'http' ? http.RequestOptions : https.RequestOptions, body?: any }
 
@@ -50,10 +49,6 @@ export class HTTPHelper {
         const _response = response as any as HTTPServerResponse
 
         _response.setStatusCode = value => {
-            if (value === 401 || value === 423 || value === 429 || value >= 500) {
-                ResilienceHelper.increment()
-                _response.setHeader('Retry-After', ResilienceHelper.backoff())
-            }
             _response.statusCode = value
         }
 
