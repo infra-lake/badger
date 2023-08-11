@@ -5,7 +5,7 @@ import { MongoDBDocument, MongoDBService, MongoDBValidationInput } from '../help
 import { ObjectHelper } from '../helpers/object.helper'
 import { StampsHelper } from '../helpers/stamps.helper'
 import { StringHelper } from '../helpers/string.helper'
-import { Regex } from '../regex'
+import { Regex, TransactionalContext } from '../regex'
 import { BatchIncomingMessage } from '../regex/batch'
 import { Export } from './export/service'
 import { ExportTask } from './export/task/service'
@@ -66,8 +66,8 @@ export class TargetService extends MongoDBService<Target, 'name'> {
         context.logger.debug('connected to Big Query successfully!!!')
         
         context.logger.debug('creating Big Query Tables and Dataset...')
-        const main = await this.table({ client, transaction, database, collection, type: 'main', create: true }) as Table
-        const temporary = await this.table({ client, transaction, database, collection, type: 'temporary', create: true }) as Table
+        const main = await this.table({ context, client, transaction, database, collection, type: 'main', create: true }) as Table
+        const temporary = await this.table({ context, client, transaction, database, collection, type: 'temporary', create: true }) as Table
         context.logger.debug('Big Query Tables was created successfully!!!')
         
         return { name: target, client, dataset, table: { main, temporary } }
@@ -79,7 +79,7 @@ export class TargetService extends MongoDBService<Target, 'name'> {
         return result
     }
 
-    public async table({ client, transaction, database, collection, type, create }: { client: BigQuery, transaction: string, database: string, collection: string, type: 'main' | 'temporary', create: boolean }) {
+    public async table({ context, client, transaction, database, collection, type, create }: { context: TransactionalContext, client: BigQuery, transaction: string, database: string, collection: string, type: 'main' | 'temporary', create: boolean }) {
 
         let name = BigQueryHelper.sanitize({ value: collection })
 
@@ -100,7 +100,7 @@ export class TargetService extends MongoDBService<Target, 'name'> {
 
         const dataset = this.dataset({ database })
 
-        const result = await BigQueryHelper.table({ client, dataset, table: schema, create })
+        const result = await BigQueryHelper.table({ context, client, dataset, table: schema, create })
 
         return result
 
