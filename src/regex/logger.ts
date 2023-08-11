@@ -27,7 +27,7 @@ export class Logger implements TransactionalContext {
     public get transaction() { return this._transaction }
     public set transaction(transaction: string) { this._transaction = transaction }
 
-    public get mode() { return (LogMode as any)[EnvironmentHelper.get('LOG_MODE', 'info')] as LogMode }
+    public get mode() { return (LogMode as any)[EnvironmentHelper.get('LOG_MODE', 'info').trim().toUpperCase()] as LogMode }
 
     public error(message: any, ...fields: any[]) { console.error(this.transaction, message, ...fields) }
     public warn(message: any, ...fields: any[]) { console.warn(this.transaction, message, ...fields) }
