@@ -48,8 +48,6 @@ export class WorkerService {
 
         const { name, status } = filter ?? {}
 
-        
-
         const workers = this.workers.filter(worker =>
             StringHelper.empty(name) ||
             worker.name.startsWith(name as string) ||

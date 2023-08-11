@@ -5,7 +5,7 @@ import { WorkerService } from '../../services/worker.service'
 
 export class VoterHTTPController implements RegexHTTPController {
 
-    public static readonly path = '^/worker$'
+    public static readonly path = '^/voter/worker$'
 
     public async get(request: HTTPIncomingMessage, response: HTTPServerResponse) {
 
@@ -18,9 +18,9 @@ export class VoterHTTPController implements RegexHTTPController {
 
         const service = Regex.inject(WorkerService)
 
-        const output = await service.list(input)
+        const result = await service.list(input)
 
-        response.write(JSON.stringify(output))
+        response.write(JSON.stringify({ result }))
         response.setStatusCode(200)
         response.end()
 

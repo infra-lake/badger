@@ -20,7 +20,7 @@ export class VoterHTTPClient {
         const { name, status } = filter ?? {}
 
         const qs = QueryStringHelper.stringify({ name, status }, 'qs')
-        const url = `${EnvironmentHelper.get('VOTER_URL')}/worker${StringHelper.empty() ? '' : `?${qs}`}`
+        const url = `${EnvironmentHelper.get('VOTER_URL')}/voter/worker${StringHelper.empty() ? '' : `?${qs}`}`
 
         const options: RequestOptions = {
             method: 'GET',

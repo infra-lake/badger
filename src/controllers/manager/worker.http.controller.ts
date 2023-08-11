@@ -19,6 +19,7 @@ export class ManagerWorkerHTTPController implements RegexHTTPController {
         const client = Regex.inject(VoterHTTPClient)
         const output = await client.workers(input)
 
+        response.setHeader('Content-Type', 'application/json')
         response.write(JSON.stringify(output))
         response.setStatusCode(200)
         response.end()
