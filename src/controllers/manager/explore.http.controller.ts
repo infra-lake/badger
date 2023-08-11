@@ -90,8 +90,8 @@ async function _input<T extends Document>(request: HTTPIncomingMessage): Promise
 
     const parameters =
         ObjectHelper.has(hash)
-            ? QueryStringHelper.parse(Buffer.from(hash, 'base64').toString('utf-8'))
-            : QueryStringHelper.parse(searchParams)
+            ? QueryStringHelper.parse({ value: Buffer.from(hash, 'base64').toString('utf-8'), mode: 'query' })
+            : QueryStringHelper.parse({ value: searchParams, mode: 'query' })
 
     const stamps = StampsHelper.extract(parameters)
     const window = WindowHelper.extract(parameters)

@@ -5,7 +5,7 @@ export class ObjectHelper {
     }
 
     public static empty(value: any) : boolean {
-        return !ObjectHelper.has(value) || Object.keys(value).length <= 0
+        return !ObjectHelper.has(value) || (value.constructor.name === 'Object' && Object.keys(value).length <= 0)
     }
 
 }

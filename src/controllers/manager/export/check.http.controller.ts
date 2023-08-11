@@ -1,7 +1,7 @@
 import { AuthHelper } from '../../../helpers/auth.helper'
 import { QueryStringHelper } from '../../../helpers/querystring.helper'
 import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController } from '../../../regex'
-import { Export, ExportService } from '../../../services/export/service'
+import { ExportService } from '../../../services/export/service'
 
 export class ManageExportCheckHTTPController implements RegexHTTPController {
 
@@ -13,8 +13,8 @@ export class ManageExportCheckHTTPController implements RegexHTTPController {
 
         const service = Regex.inject(ExportService)
 
-        const { searchParams } = request.getURL() 
-        const parameters = QueryStringHelper.parse(searchParams)
+        const { searchParams } = request.getURL()
+        const parameters = QueryStringHelper.parse({ value: searchParams, mode: 'query' })
         const { transaction, source, target, database } = parameters
         const id = { transaction, source, target, database }
 

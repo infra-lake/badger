@@ -32,7 +32,7 @@ export class ManagerSourceHTTPController implements RegexHTTPController {
         if (!AuthHelper.validate(request, response)) { return }
 
         const { searchParams } = request.getURL()
-        const parameters = QueryStringHelper.parse(searchParams)
+        const parameters = QueryStringHelper.parse({ value: searchParams, mode: 'query' })
         const { filter = {} } = parameters
 
         const service = Regex.inject(SourceService)
@@ -59,7 +59,7 @@ export class ManagerSourceHTTPController implements RegexHTTPController {
         if (!AuthHelper.validate(request, response)) { return }
 
         const { searchParams } = request.getURL()
-        const { name } = QueryStringHelper.parse(searchParams)
+        const { name } = QueryStringHelper.parse({ value: searchParams, mode: 'raw' })
 
         let service = Regex.inject(SourceService)
         await service.delete({ context: request, id: { name } })

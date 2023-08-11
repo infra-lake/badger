@@ -3,6 +3,11 @@ import { BadRequestError } from '../exceptions/bad-request.error'
 import { DateHelper } from './date.helper'
 import { NumberHelper } from './number.helper'
 
+export type QueryStringHelperParseInput = {
+    value: URLSearchParams | string
+    mode: 'query' | 'raw'
+}
+
 export class QueryStringHelper {
 
     public static transform(value: string) {
@@ -22,26 +27,30 @@ export class QueryStringHelper {
 
     }
 
-    public static parse(value: URLSearchParams | string): any {
+    public static parse({ value, mode }: QueryStringHelperParseInput): any {
 
         if (typeof value !== 'string') {
-            return QueryStringHelper.parse(value.toString())
+            return QueryStringHelper.parse({ value: value.toString(), mode })
         }
 
         const parameters = qs.parse(value, { decoder: QueryStringHelper.decoder, charset: 'utf-8' }) as any
 
-        parameters.limit = parameters.limit ?? 10
+        if (mode === 'query') {
 
-        parameters.mode = parameters.mode ?? 'offset'
+            parameters.limit = parameters.limit ?? 10
 
-        parameters.index =
-            parameters.mode === 'offset'
-                ? { mode: 'offset', value: parameters.offset ?? 0 }
-                : { mode: 'page', value: parameters.page ?? 0 }
+            parameters.mode = parameters.mode ?? 'offset'
 
-        delete parameters.mode
-        delete parameters.offset
-        delete parameters.page
+            parameters.index =
+                parameters.mode === 'offset'
+                    ? { mode: 'offset', value: parameters.offset ?? 0 }
+                    : { mode: 'page', value: parameters.page ?? 0 }
+
+            delete parameters.mode
+            delete parameters.offset
+            delete parameters.page
+
+        }
 
         return parameters
 
@@ -102,7 +111,7 @@ export class QueryStringHelper {
 
 
     public static stringify(object: any, mode: 'base64' | 'qs' = 'base64'): string {
-        
+
         const string = qs.stringify(object, {
             encoder: QueryStringHelper.encoder,
             encodeValuesOnly: true,
@@ -114,9 +123,9 @@ export class QueryStringHelper {
         }
 
         const result = Buffer.from(string, 'utf-8').toString('base64')
-        
+
         return result
-        
+
     }
 
     private static encoder(value: any, defaultEncoder: qs.defaultEncoder, charset: string, type: "value" | "key"): string {

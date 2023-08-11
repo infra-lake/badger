@@ -51,8 +51,9 @@ async function listener(request: IncomingMessage, response: ServerResponse) {
     const method = _request.method?.toLocaleLowerCase()
 
     try {
-
-        _request.logger.log('call', method, 'on', pathname, ObjectHelper.empty(searchParams) ? '' : QueryStringHelper.parse(searchParams))
+        
+        const qs = QueryStringHelper.parse({ value: searchParams, mode: 'raw' }) 
+        _request.logger.log('call', method, 'on', pathname, ObjectHelper.empty(qs) ? '' : qs)
         MetricHelper.http_received_request_total.inc()
         MetricHelper.http_received_request_total.inc({ path: pathname })
 

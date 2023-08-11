@@ -12,7 +12,7 @@ export class ManagerWorkerHTTPController implements RegexHTTPController {
         if (!AuthHelper.validate(request, response)) { return }
 
         const { searchParams } = request.getURL()
-        const { filter = {} } = QueryStringHelper.parse(searchParams)
+        const { filter = {} } = QueryStringHelper.parse({ value: searchParams, mode: 'query' })
         const { name, status } = filter ?? {}
         const input = { context: request, filter: { name, status } }
 

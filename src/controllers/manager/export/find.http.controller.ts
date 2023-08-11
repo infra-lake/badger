@@ -15,17 +15,17 @@ export class ManageExportFindHTTPController implements RegexHTTPController {
 
         const service = Regex.inject(ExportService)
 
-        const { searchParams } = request.getURL() 
-        const parameters = QueryStringHelper.parse(searchParams)
+        const { searchParams } = request.getURL()
+        const parameters = QueryStringHelper.parse({ value: searchParams, mode: 'query' })
         const filter = (ObjectHelper.has(parameters.filter) ? parameters.filter : undefined)
         const options = { projection: parameters.projection, sort: parameters.sort }
 
         let count = await service.count({ context: request, filter, options: options as CountDocumentsOptions })
-        
+
         response.setHeader('Content-Type', 'application/json')
         response.write(`{ "metadata": ${JSON.stringify({ count })}, "results": [`)
         response.setStatusCode(200)
-        
+
         const cursor = service.find({ context: request, filter, options })
         while (await cursor.hasNext()) {
             const document = await cursor.next()

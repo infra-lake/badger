@@ -11,7 +11,7 @@ export class ManagerExportTaskHTTPController implements RegexHTTPController {
         if (!AuthHelper.validate(request, response)) { return }
 
         const { searchParams } = request.getURL()
-        const parameters = QueryStringHelper.parse(searchParams)
+        const parameters = QueryStringHelper.parse({ value: searchParams, mode: 'query' })
         const { filter = {} } = parameters
 
         const service = Regex.inject(ExportTaskService)
