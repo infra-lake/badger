@@ -1,7 +1,7 @@
 import { AuthHelper } from '../../helpers/auth.helper'
+import { WorkerHelper } from '../../helpers/worker.helper'
 import { HTTPIncomingMessage, HTTPServerResponse, Regex, RegexHTTPController } from '../../regex'
 import { ExportTaskStartInput, ExportTaskStartService } from '../../services/export/task/start.service'
-import { WorkerService } from '../../services/worker.service'
 
 export class WorkerHTTPController implements RegexHTTPController {
 
@@ -17,10 +17,7 @@ export class WorkerHTTPController implements RegexHTTPController {
         const { transaction, source, target, database, collection } = body
         const id = { transaction, source, target, database, collection }
 
-        const workers = Regex.inject(WorkerService)
-        const worker = workers.name()
-
-        const document = { worker }
+        const document = { worker: WorkerHelper.CURRENT }
 
         const input = { context: request, id, document }
 

@@ -7,13 +7,9 @@ import { AuthHelper } from '../helpers/auth.helper'
 import { EnvironmentHelper } from '../helpers/environment.helper'
 import { HTTPHelper } from '../helpers/http.helper'
 import { StringHelper } from '../helpers/string.helper'
+import { Worker, WorkerHelper } from '../helpers/worker.helper'
 import { Regex, TransactionalContext } from '../regex'
 import { ExportTaskService } from './export/task/service'
-
-export interface Worker {
-    name: string
-    url: string
-}
 
 export type WorkerTestInput = { context: TransactionalContext, worker: Worker }
 export type WorkerStatus = 'free' | 'busy'
@@ -25,13 +21,6 @@ export type WorkerGetInput = { id: Pick<Worker, 'name'> }
 export class WorkerService {
 
     private readonly workers: Array<Worker> = []
-
-    public name() {
-        if ([ApplicationMode.MANAGER, ApplicationMode.VOTER].includes(ApplicationHelper.MODE)) {
-            throw new UnsupportedOperationError(`${WorkerService.name}.name()`)
-        }
-        return EnvironmentHelper.get('WORKER_NAME').trim().toLowerCase()
-    }
 
     public get({ id }: WorkerGetInput) {
         if ([ApplicationMode.MANAGER, ApplicationMode.WORKER].includes(ApplicationHelper.MODE)) {
@@ -75,13 +64,10 @@ export class WorkerService {
             throw new UnsupportedOperationError(`${WorkerService.name}.load()`)
         }
 
-        await Promise.all(EnvironmentHelper
-            .list('^WORKER_[a-zA-Z0-9]+_URL$')
-            .map(({ key: name, value: url }) => ({ name: name.replace('WORKER_', '').replace('_URL', '').toLocaleLowerCase(), url }))
-            .map(async worker => {
-                await this.test({ context, worker })
-                this.workers.push(worker)
-            }))
+        await Promise.all(WorkerHelper.WORKERS.map(async worker => {
+            await this.test({ context, worker })
+            this.workers.push(worker)
+        }))
 
     }
 

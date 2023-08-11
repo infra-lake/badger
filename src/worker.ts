@@ -3,6 +3,7 @@ import { WorkerHTTPController } from './controllers/worker/http.controller'
 import { ApplicationHelper } from './helpers/application.helper'
 import { EnvironmentHelper } from './helpers/environment.helper'
 import { MetricHelper } from './helpers/metric.helper'
+import { WorkerHelper } from './helpers/worker.helper'
 import { Regex, RegexApplication, StartupInput } from './regex'
 import { SettingsService } from './services/settings.service'
 
@@ -20,7 +21,7 @@ export async function startup({ logger, http, batch }: StartupInput) {
         logger.log(LOGO)
         logger.log(`badger ${ApplicationHelper.MODE} v${version} was successfull started on port`, port)
         await batch?.manager.start()
-        MetricHelper.service_state_up.set({
+        const labels: any = {
             version: EnvironmentHelper.get('PROJECT_VERSION'),
             log_mode: EnvironmentHelper.get('LOG_MODE'),
             port: EnvironmentHelper.get('PORT'),
@@ -31,8 +32,10 @@ export async function startup({ logger, http, batch }: StartupInput) {
             default_stamp_insert: EnvironmentHelper.get('DEFAULT_STAMP_INSERT'),
             default_stamp_update: EnvironmentHelper.get('DEFAULT_STAMP_UPDATE'),
             default_stamp_id: EnvironmentHelper.get('DEFAULT_STAMP_ID'),
-            default_stamp_dataset_name_prefix: EnvironmentHelper.get('DEFAULT_STAMP_DATASET_NAME_PREFIX')
-        }, 1)
+            worker_name: WorkerHelper.CURRENT
+        }
+        MetricHelper.service_state_up.set(labels, 1)
+        logger.log('environments:', Object.keys(labels).map(key => `${key.toLocaleUpperCase()}:"${labels[key]}"`))
     })
 
 }

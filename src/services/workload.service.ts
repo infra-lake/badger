@@ -1,3 +1,4 @@
+import { Filter } from "mongodb"
 import { UnsupportedOperationError } from "../exceptions/unsupported-operation.error"
 import { ApplicationHelper, ApplicationMode } from "../helpers/application.helper"
 import { StampsHelper } from "../helpers/stamps.helper"
@@ -9,7 +10,8 @@ import { ExportTaskFinishService } from "./export/task/finish.service"
 import { ExportTask, ExportTaskService } from "./export/task/service"
 import { SourceOutput, SourceService } from "./source.service"
 import { TargetOutput, TargetService } from "./target.service"
-import { Worker, WorkerService } from "./worker.service"
+import { WorkerService } from "./worker.service"
+import { WorkerHelper } from "../helpers/worker.helper"
 
 
 export class WorkloadService {
@@ -20,14 +22,20 @@ export class WorkloadService {
             throw new UnsupportedOperationError('ExportTaskService.next()')
         }
 
-        const workers = Regex.inject(WorkerService)
-        const worker = workers.name()
+        const worker = WorkerHelper.CURRENT
+
+        context.logger.debug('worker.name', worker)
 
         const tasks = Regex.inject(ExportTaskService)
-        const cursor = tasks.find({ context, filter: { worker, status: 'running' } })
-        if (!await cursor.hasNext()) { return undefined }
+        const filter: Filter<ExportTask> = { worker, status: 'running' }
+        const cursor = tasks.find({ context, filter })
+        if (!await cursor.hasNext()) {
+            context.logger.debug('task does not find for:', filter)
+            return
+        }
         const task = await cursor.next() as ExportTask
         await cursor.close()
+        context.logger.debug('new task was found:', task)
 
         context.transaction = task.transaction
 
@@ -110,7 +118,11 @@ export class Workload {
 
         await this.consolidate()
 
+        this.context.logger.log(`removing temporary data "${this.target.table.temporary.metadata.id}"...`)
+
         await this.cleanup()
+
+        this.context.logger.log(`removing temporary data was removed successfully!!!`)
 
         const finish = Regex.inject(ExportTaskFinishService)
         await finish.apply({ context: this.context, id, document })
@@ -151,6 +163,8 @@ export class Workload {
         `)
 
         await ThreadHelper.sleep(10000)
+
+        this.context.logger.log(`temporary data was consolidated to table "${this.target.table.main.metadata.id}" successfully!!!`)
 
     }
 

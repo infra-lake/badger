@@ -1,18 +1,11 @@
 import { UnsupportedOperationError } from "../../../exceptions/unsupported-operation.error"
 import { ApplicationHelper, ApplicationMode } from "../../../helpers/application.helper"
 import { MongoDBDocument, MongoDBService, MongoDBValidationInput } from "../../../helpers/mongodb.helper"
-import { StampsHelper } from "../../../helpers/stamps.helper"
 import { StringHelper } from "../../../helpers/string.helper"
-import { ThreadHelper } from "../../../helpers/thread.helper"
-import { Regex, TransactionalContext } from "../../../regex"
-import { BatchIncomingMessage } from "../../../regex/batch"
+import { Worker } from "../../../helpers/worker.helper"
+import { TransactionalContext } from "../../../regex"
 import { SettingsService } from "../../settings.service"
-import { SourceOutput, SourceService } from "../../source.service"
-import { TargetOutput, TargetService } from "../../target.service"
-import { Worker } from "../../worker.service"
 import { Export } from "../service"
-import { ExportTaskErrorService } from "./error.service"
-import { ExportTaskFinishService } from "./finish.service"
 
 export interface ExportTask extends MongoDBDocument<ExportTask, 'transaction' | 'source' | 'target' | 'database' | 'collection'> {
     transaction: Export['transaction']
@@ -33,7 +26,7 @@ export type ExportTaskStateChangeStopInput = Omit<ExportTaskStateChangeInput, 'i
 export type ExportTaskStateChangeRetryInput = Omit<ExportTaskStateChangeInput, 'id' | 'document'> & { id: Pick<ExportTask, 'transaction' | 'source' | 'target' | 'database'> }
 
 export class ExportTaskService extends MongoDBService<ExportTask, 'transaction' | 'source' | 'target' | 'database' | 'collection'> {
-    
+
     protected get database() { return SettingsService.DATABASE }
     public get collection() { return 'tasks' }
 

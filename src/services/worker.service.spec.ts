@@ -1,8 +1,9 @@
 import { ApplicationMode } from "../helpers/application.helper";
 import { EnvironmentHelper } from "../helpers/environment.helper";
+import { Worker } from "../helpers/worker.helper";
 import { Logger, Regex } from "../regex";
 import { ExportTaskService } from "./export/task/service";
-import { Worker, WorkerService, WorkerTestInput } from "./worker.service";
+import { WorkerService, WorkerTestInput } from "./worker.service";
 
 
 describe('WorkerService', () => {
