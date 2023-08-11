@@ -28,6 +28,7 @@ export class WorkerHTTPController implements RegexHTTPController {
 
         await service.apply(input)
 
+        response.setHeader('Content-Type', 'application/json')
         response.setStatusCode(200)
         response.end()
 

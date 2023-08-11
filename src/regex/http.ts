@@ -8,6 +8,7 @@ import { MetricHelper } from '../helpers/metric.helper'
 import { ObjectHelper } from '../helpers/object.helper'
 import { TransactionalContext } from './context'
 import { Regex, RegexField } from './ioc'
+import { QueryStringHelper } from '../helpers/querystring.helper'
 
 export interface HTTPIncomingMessage extends IncomingMessage, TransactionalContext {
     getURL(): URL
@@ -51,7 +52,7 @@ async function listener(request: IncomingMessage, response: ServerResponse) {
 
     try {
 
-        _request.logger.log('call', method, 'on', pathname, searchParams.toString())
+        _request.logger.log('call', method, 'on', pathname, QueryStringHelper.parse(searchParams))
         MetricHelper.http_received_request_total.inc()
         MetricHelper.http_received_request_total.inc({ path: pathname })
 

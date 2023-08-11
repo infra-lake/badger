@@ -20,6 +20,7 @@ export class VoterHTTPController implements RegexHTTPController {
 
         const result = await service.list(input)
 
+        response.setHeader('Content-Type', 'application/json')
         response.write(JSON.stringify({ result }))
         response.setStatusCode(200)
         response.end()

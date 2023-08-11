@@ -21,6 +21,7 @@ export class ManagerExportStopHTTPController implements RegexHTTPController {
         const service = Regex.inject(ExportStopService)
         await service.apply(input)
 
+        response.setHeader('Content-Type', 'application/json')
         response.write(JSON.stringify({ transaction: body.transaction }))
         response.setStatusCode(200)
         response.end()

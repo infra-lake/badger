@@ -15,6 +15,7 @@ export class ManageExportCleanupHTTPController implements RegexHTTPController {
 
         await service.cleanup()
 
+        response.setHeader('Content-Type', 'application/json')
         response.write(JSON.stringify({ transaction: request.transaction }))
         response.setStatusCode(200)
         response.end()

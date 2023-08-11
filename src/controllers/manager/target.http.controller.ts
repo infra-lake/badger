@@ -21,6 +21,7 @@ export class ManagerTargetHTTPController implements RegexHTTPController {
         const service = Regex.inject(TargetService)
         await service.save(input)
 
+        response.setHeader('Content-Type', 'application/json')
         response.write(JSON.stringify({ transaction: request.transaction }))
         response.end()
 
@@ -63,6 +64,7 @@ export class ManagerTargetHTTPController implements RegexHTTPController {
         let service = Regex.inject(TargetService)
         await service.delete({ context: request, id: { name } })
 
+        response.setHeader('Content-Type', 'application/json')
         response.write(JSON.stringify({ transaction: request.transaction }))
         response.end()
 

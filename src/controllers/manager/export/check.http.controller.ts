@@ -20,6 +20,7 @@ export class ManageExportCheckHTTPController implements RegexHTTPController {
 
         const result = await service.check({ context: request, id })
 
+        response.setHeader('Content-Type', 'application/json')
         response.write(JSON.stringify(result))
         response.setStatusCode(200)
         response.end()
