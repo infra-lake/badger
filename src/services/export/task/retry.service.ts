@@ -80,6 +80,7 @@ export class ExportTaskRetryService {
         if (StringHelper.empty(database)) { throw new BadRequestError('database id is empty') }
         if (!ObjectHelper.has(force)) { throw new BadRequestError('force is empty') }
 
+        const exports = Regex.inject(ExportService)
         const found = await exports.get({ id: { transaction, source, target, database } })
         if (!ObjectHelper.has(found)) { throw new NotFoundError('export') }
 

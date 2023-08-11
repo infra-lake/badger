@@ -23,6 +23,10 @@ export class SettingsService {
         const exports = Regex.inject(ExportService).collection
         const tasks = Regex.inject(ExportTaskService).collection
 
+        if (collections.filter(({ collectionName }) => collectionName === 'temps').length > 0) {
+            await database.dropCollection('temps')
+        }
+
         if (collections.filter(({ collectionName }) => collectionName === sources).length <= 0) {
             await database.createCollection(sources)
         }

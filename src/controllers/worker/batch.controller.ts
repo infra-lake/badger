@@ -112,14 +112,15 @@ export class WorkerBatchController implements RegexBatchController {
                 appendFileSync(fd, `${JSON.stringify(row)}\n`, { encoding: 'utf-8' })
 
                 context.logger.debug('append collection to temp file:', `${tempdir}/${tempfile}`)
-
+                appends++
                 const statistics = {
-                    count: count.toLocaleString('pt-BR'),
-                    percent: ((++appends / count) * 100).toFixed(2),
+                    count: appends,
+                    total: count.toLocaleString('pt-BR'),
+                    percent: ((appends / count) * 100).toFixed(2),
                     size: bytes(fstatSync(fd).size)
                 }
 
-                context.logger.log('append statistics:', statistics.count, 'rows,', statistics.percent, '%,', statistics.size, ')')
+                context.logger.log('append statistics:', statistics.count, 'of', statistics.total, 'rows,', statistics.percent, '%,', statistics.size, ')')
 
             }
 
