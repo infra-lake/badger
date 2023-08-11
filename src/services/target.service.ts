@@ -83,6 +83,7 @@ export class TargetService extends MongoDBService<Target, 'name'> {
         }
 
         const schema = {
+            sourceFormat: 'NEWLINE_DELIMITED_JSON',
             name,
             fields: [
                 { name: StampsHelper.DEFAULT_STAMP_ID, type: 'STRING', mode: 'REQUIRED' },
