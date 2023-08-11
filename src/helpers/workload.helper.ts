@@ -77,7 +77,10 @@ export class WorkloadStatistics {
             count: this._ingested.count.toLocaleString('pt-BR'),
             size: bytes(this._ingested.bytes)
         }
-        return `${current.count} rows (${current.size}) to bigquery temporary table "${this.table}" (${ingested.percent}%, ${ingested.count} rows, ${ingested.size})`
+        const limit = {
+            bytes: bytes(this.limits.bytes)
+        }
+        return `${current.count} rows (${current.size}) to bigquery table "${this.table}" (${ingested.percent}%, ${ingested.count} rows, ${ingested.size}) (throughput: ${limit.bytes}/insert)`
     }
 
 }

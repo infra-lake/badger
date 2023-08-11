@@ -135,11 +135,12 @@ export class WorkerBatchController implements RegexBatchController {
         return rows.length > 0 && (remaining <= 0 || bytes > this.limits.bytes)
     }
 
-    private async insert({ context, workload, rows, statistics }: WorkerInsertInput) {
+    private async insert({ context, workload, rows, statistics }: WorkerInsertInput): Promise<WorkerInsertInput['rows']> {
 
         const { count } = workload
         const included = rows
         const excluded = [] as WorkerInsertInput['rows']
+
 
         while (statistics.simulate({ rows: included, task: { count } }).broken) {
             excluded.push(included.pop())
@@ -148,7 +149,16 @@ export class WorkerBatchController implements RegexBatchController {
         const date = included[included.length - 1][StampsHelper.DEFAULT_STAMP_UPDATE]
         included.forEach(row => delete row[StampsHelper.DEFAULT_STAMP_UPDATE])
 
-        await workload.target.table.temporary.insert(included)
+        try {
+            await workload.target.table.temporary.insert(included)
+            this.limits.bytes = this.limits.bytes * 1.1
+        } catch (error) {
+            if (this.isTooLarge(error)) {
+                this.limits.bytes = this.limits.bytes * 0.9
+                return await this.insert({ context, workload, rows, statistics })
+            }
+            throw error
+        }
 
         await workload.update(date, count + included.length)
 

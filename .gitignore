@@ -4,3 +4,6 @@ node_modules
 dist
 *.dtmp
 *.bkp
+key.json
+playground.bigquery.sql
+playground.mongodb.js
