@@ -3,6 +3,7 @@ import { UnsupportedOperationError } from "../exceptions/unsupported-operation.e
 import { ApplicationHelper, ApplicationMode } from "../helpers/application.helper"
 import { StampsHelper } from "../helpers/stamps.helper"
 import { ThreadHelper } from "../helpers/thread.helper"
+import { WorkerHelper } from "../helpers/worker.helper"
 import { Regex } from "../regex"
 import { BatchIncomingMessage } from "../regex/batch"
 import { ExportTaskErrorService } from "./export/task/error.service"
@@ -10,8 +11,6 @@ import { ExportTaskFinishService } from "./export/task/finish.service"
 import { ExportTask, ExportTaskService } from "./export/task/service"
 import { SourceOutput, SourceService } from "./source.service"
 import { TargetOutput, TargetService } from "./target.service"
-import { WorkerService } from "./worker.service"
-import { WorkerHelper } from "../helpers/worker.helper"
 
 
 export class WorkloadService {

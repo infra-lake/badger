@@ -75,13 +75,17 @@ export class SourceService extends MongoDBService<Source, 'name'> {
         const { source, target, database, collection, date } = task
 
         const sources = Regex.inject(SourceService)
+        
+        context.logger.debug('connecting to source ', source, '...')
         const client = await sources.connect({ name: source })
-
-        const window = {
-            begin: date ?? await this.last({ source, target, database, collection }),
-            end: context.date
-        }
-
+        context.logger.debug('connected to source', source, 'successfully !!!')
+        
+        context.logger.debug('defining window range...')
+        const begin = date ?? await this.last({ source, target, database, collection })
+        const end = context.date        
+        const window = { begin, end }
+        context.logger.debug('window range defined:', window)
+        
         const filter = ExportService.filter(window)
 
         const count = async () => {

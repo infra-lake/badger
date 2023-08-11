@@ -56,15 +56,20 @@ export class TargetService extends MongoDBService<Target, 'name'> {
     public async target({ context, task }: TargetInput): Promise<TargetOutput> {
 
         const { transaction, target, database, collection } = task
-        const dataset = this.dataset({ database: task.database })
 
+        const dataset = this.dataset({ database: task.database })
+        
+        context.logger.debug('connecting to Big Query...')
         const service = Regex.inject(TargetService)
         const { credentials } = await service.get({ context, id: { name: target } }) as Target
         const client = new BigQuery({ credentials })
-
+        context.logger.debug('connected to Big Query successfully!!!')
+        
+        context.logger.debug('creating Big Query Tables and Dataset...')
         const main = await this.table({ client, transaction, database, collection, type: 'main', create: true }) as Table
         const temporary = await this.table({ client, transaction, database, collection, type: 'temporary', create: true }) as Table
-
+        context.logger.debug('Big Query Tables was created successfully!!!')
+        
         return { name: target, client, dataset, table: { main, temporary } }
 
     }
