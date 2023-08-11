@@ -1,15 +1,13 @@
 import { RequestOptions } from 'http'
-import { BadRequestError } from '../exceptions/bad-request.error'
 import { InvalidParameterError } from '../exceptions/invalid-parameter.error'
 import { NotFoundError } from '../exceptions/not-found.error'
+import { UnsupportedOperationError } from '../exceptions/unsupported-operation.error'
 import { ApplicationHelper, ApplicationMode } from '../helpers/application.helper'
 import { AuthHelper } from '../helpers/auth.helper'
 import { EnvironmentHelper } from '../helpers/environment.helper'
 import { HTTPHelper } from '../helpers/http.helper'
-import { QueryStringHelper } from '../helpers/querystring.helper'
 import { StringHelper } from '../helpers/string.helper'
 import { Regex, TransactionalContext } from '../regex'
-import { UnsupportedOperationError } from '../exceptions/unsupported-operation.error'
 import { ExportTaskService } from './export/task/service'
 
 export interface Worker {
@@ -46,6 +44,8 @@ export class WorkerService {
 
     public async list({ context, filter }: WorkerServiceListInput): Promise<WorkerServiceListOutput> {
 
+        context.logger.log('WorkerService.list() input.filter:', filter)
+
         const { name, status } = filter ?? {}
 
         const workers = this.workers.filter(worker =>
@@ -64,7 +64,9 @@ export class WorkerService {
         })
 
         const result = StringHelper.empty(status) ? temp : temp.filter(worker => worker.status === status)
-        
+
+        context.logger.log('WorkerService.list() result:', result)
+
         return result
 
     }
@@ -111,6 +113,6 @@ export class WorkerService {
 
     }
 
-    
+
 
 }
