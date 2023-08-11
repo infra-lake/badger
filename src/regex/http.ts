@@ -52,7 +52,7 @@ async function listener(request: IncomingMessage, response: ServerResponse) {
 
     try {
 
-        _request.logger.log('call', method, 'on', pathname, QueryStringHelper.parse(searchParams))
+        _request.logger.log('call', method, 'on', pathname, ObjectHelper.empty(searchParams) ? '' : QueryStringHelper.parse(searchParams))
         MetricHelper.http_received_request_total.inc()
         MetricHelper.http_received_request_total.inc({ path: pathname })
 

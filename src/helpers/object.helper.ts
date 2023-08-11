@@ -4,4 +4,8 @@ export class ObjectHelper {
         return value !== null && value !== undefined
     }
 
+    public static empty(value: any) : boolean {
+        return !ObjectHelper.has(value) || Object.keys(value).length <= 0
+    }
+
 }
