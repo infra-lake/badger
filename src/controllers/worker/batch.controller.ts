@@ -99,6 +99,7 @@ export class WorkerBatchController implements RegexBatchController {
                 const row = this.row({ chunk, date: context.date })
                 appendFileSync(fd, `${JSON.stringify(row)}\n`, { encoding: 'utf-8' })
             }
+            await cursor.close()
 
         } catch (error) {
             throw error

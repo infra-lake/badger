@@ -44,14 +44,14 @@ export class WorkerService {
 
     public async list({ context, filter }: WorkerServiceListInput): Promise<WorkerServiceListOutput> {
 
-        context.logger.log('WorkerService.list() input.filter:', filter)
-
         const { name, status } = filter ?? {}
 
+        const _name = (name ?? '').toString()
+
         const workers = this.workers.filter(worker =>
-            StringHelper.empty(name) ||
-            worker.name.startsWith(name as string) ||
-            worker.name.endsWith(name as string)
+            StringHelper.empty(_name) ||
+            worker.name.startsWith(_name) ||
+            worker.name.endsWith(_name)
         )
 
         const task = Regex.inject(ExportTaskService)
@@ -64,8 +64,6 @@ export class WorkerService {
         })
 
         const result = StringHelper.empty(status) ? temp : temp.filter(worker => worker.status === status)
-
-        context.logger.log('WorkerService.list() result:', result)
 
         return result
 

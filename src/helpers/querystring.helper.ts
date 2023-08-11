@@ -129,7 +129,7 @@ export class QueryStringHelper {
             try {
                 const result = NumberHelper.parse(value)
             } catch (error) {
-                return `'value'`
+                return `'${value}'`
             }
         }
 

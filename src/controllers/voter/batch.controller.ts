@@ -21,7 +21,7 @@ export class VoterBatchController implements RegexBatchController {
 
         const workers = Regex.inject(WorkerService)
         const free = await workers.list({ context: message, filter: { status: 'free' } })
-        message.logger.log('free workers:', JSON.stringify(free))
+        message.logger.log('free workers:', free)
 
         if (free.length <= 0) { return }
 

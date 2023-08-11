@@ -1,12 +1,12 @@
 import { RequestOptions } from 'http'
+import { BadRequestError } from '../exceptions/bad-request.error'
+import { UnsupportedOperationError } from '../exceptions/unsupported-operation.error'
+import { ApplicationHelper, ApplicationMode } from '../helpers/application.helper'
 import { EnvironmentHelper } from "../helpers/environment.helper"
+import { HTTPHelper } from '../helpers/http.helper'
 import { QueryStringHelper } from "../helpers/querystring.helper"
 import { StringHelper } from "../helpers/string.helper"
 import { WorkerServiceListInput, WorkerServiceListOutput } from "../services/worker.service"
-import { HTTPHelper } from '../helpers/http.helper'
-import { BadRequestError } from '../exceptions/bad-request.error'
-import { ApplicationHelper, ApplicationMode } from '../helpers/application.helper'
-import { UnsupportedOperationError } from '../exceptions/unsupported-operation.error'
 
 
 export class VoterHTTPClient {
@@ -19,8 +19,8 @@ export class VoterHTTPClient {
 
         const { name, status } = filter ?? {}
 
-        const qs = QueryStringHelper.stringify({ name, status }, 'qs')
-        const url = `${EnvironmentHelper.get('VOTER_URL')}/voter/worker${StringHelper.empty() ? '' : `?${qs}`}`
+        const qs = QueryStringHelper.stringify({ filter: { name, status } }, 'qs')
+        const url = `${EnvironmentHelper.get('VOTER_URL')}/voter/worker${StringHelper.empty(qs) ? '' : `?${qs}`}`
 
         const options: RequestOptions = {
             method: 'GET',
@@ -41,7 +41,7 @@ export class VoterHTTPClient {
         const result = await response.json<WorkerServiceListOutput>()
 
         return result
-    
+
     }
 
 }
