@@ -34,9 +34,9 @@ export class VoterBatchController implements RegexBatchController {
             const { transaction, source, target, database, collection } = await cursor1.next() as ExportTask
             const id = { transaction, source, target, database, collection }
 
-            const index = Math.floor(Math.random() * free.length)
-            message.logger.log('sorted worker index:', index)
-            const worker = free[index].name
+            const worker = free[Math.floor(Math.random() * free.length)].name
+            message.logger.log('sorted worker:', worker)
+
             const document = { worker }
 
             const client = Regex.inject(WorkerHTTPClient)

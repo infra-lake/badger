@@ -37,7 +37,7 @@ export class WorkerService {
         if ([ApplicationMode.MANAGER, ApplicationMode.WORKER].includes(ApplicationHelper.MODE)) {
             throw new UnsupportedOperationError(`${WorkerService.name}.get()`)
         }
-        const found = this.workers.map(worker => worker)
+        const found = this.workers.filter(worker => worker.name === id.name)
         if (found.length <= 0) { throw new NotFoundError('worker', `id: "${JSON.stringify(id)}"`) }
         return found[0]
     }
