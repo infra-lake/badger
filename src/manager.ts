@@ -3,6 +3,7 @@ import { ManageExportCheckHTTPController } from './controllers/manager/export/ch
 import { ManageExportCleanupHTTPController } from './controllers/manager/export/cleanup.http.controller'
 import { ManagerExportCreateHTTPController } from './controllers/manager/export/create.http.controller'
 import { ManageExportFindHTTPController } from './controllers/manager/export/find.http.controller'
+import { ManagerExportPlayHTTPController } from './controllers/manager/export/play.http.controller'
 import { ManagerExportRetryHTTPController } from './controllers/manager/export/retry.http.controller'
 import { ManagerExportStopHTTPController } from './controllers/manager/export/stop.http.controller'
 import { ManagerExportTaskHTTPController } from './controllers/manager/export/task.http.controller'
@@ -24,6 +25,7 @@ Regex.controller(ManageExportCheckHTTPController)
 Regex.controller(ManageExportCleanupHTTPController)
 Regex.controller(ManagerExportCreateHTTPController)
 Regex.controller(ManageExportFindHTTPController)
+Regex.controller(ManagerExportPlayHTTPController)
 Regex.controller(ManagerExportRetryHTTPController)
 Regex.controller(ManagerExportStopHTTPController)
 Regex.controller(ManagerExportTaskHTTPController)

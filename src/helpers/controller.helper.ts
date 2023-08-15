@@ -11,16 +11,20 @@ export class ControllerHelper {
 
         logger.error('error:', error)
 
+        const bad = error instanceof BadRequestError
+        
+        response.setStatusCode(bad ? 400 : 500)
+        
+        if (bad) {
+            const { message } = error
+            response.setHeader('Content-Type', 'application/json')
+            response.write(JSON.stringify({ message }))
+        }
+
         if (error instanceof NotFoundError) {
             const { handle } = Regex.inject(NotFoundController)
             await handle(request, response)
             return
-        }
-
-        const bad = error instanceof BadRequestError
-        response.setStatusCode(bad ? 400 : 500)
-        if (bad) {
-            response.write(error.message)
         }
 
         response.end()

@@ -29,7 +29,7 @@ export class ManageExportFindHTTPController implements RegexHTTPController {
         const cursor = service.find({ context: request, filter, options })
         while (await cursor.hasNext()) {
             const document = await cursor.next()
-            if (++count > 1) { response.write(',') }
+            if (count++ > 1) { response.write(',') }
             response.write(JSON.stringify(document))
         }
 

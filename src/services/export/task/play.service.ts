@@ -12,13 +12,12 @@ import { SettingsService } from '../../settings.service'
 import { ExportTask, ExportTaskService } from './service'
 import { Source, SourceService } from '../../source.service'
 
-export type ExportTaskRetryInput = {
+export type ExportTaskPlayInput = {
     context: TransactionalContext
     id: Required<Pick<ExportTask, 'transaction' | 'source' | 'target' | 'database'>>
-    document: { force: boolean }
 }
 
-export class ExportTaskRetryService {
+export class ExportTaskPlayService {
 
     private get collection() {
         const client = Regex.inject(MongoClient)
@@ -26,60 +25,49 @@ export class ExportTaskRetryService {
         return client.db(SettingsService.DATABASE).collection(service.collection)
     }
 
-    public async apply(input: ExportTaskRetryInput) {
+    public async apply(input: ExportTaskPlayInput) {
 
         await this.validate(input)
 
-        const { context, id, document } = input
+        const { context, id } = input
         const { transaction, source, target, database } = id
-        const { force } = document
 
-        const status = 'error'
+        const status = 'stopped'
 
         const exports = Regex.inject(ExportService)
 
         context.logger.log(`setting status "${status}" to export tasks of export "${exports.name(id)}"`)
         
-        const filter = force
-            ? {
-                transaction, source, target, database,
-                $or: [{ status: 'error' }, { status: 'stopped' }]
-            }
-            : { transaction, source, target, database, status }
-
         await this.collection.updateMany(
-            filter,
+            { transaction, source, target, database, status },
             { $set: { status: 'created', worker: null, date: null, error: null } },
             { upsert: false }
         )
 
     }
 
-    protected async validate(input: ExportTaskRetryInput) {
+    protected async validate(input: ExportTaskPlayInput) {
 
         if (![ApplicationMode.MANAGER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
-            throw new UnsupportedOperationError(ExportTaskRetryService.name)
+            throw new UnsupportedOperationError(ExportTaskPlayService.name)
         }
 
         if (!ObjectHelper.has(input)) { throw new InvalidParameterError('input') }
 
-        const { context, id, document } = input
+        const { context, id } = input
 
         if (!ObjectHelper.has(context)) { throw new InvalidParameterError('context') }
         if (!ObjectHelper.has(id)) { throw new InvalidParameterError('id') }
-        if (!ObjectHelper.has(document)) { throw new InvalidParameterError('document') }
 
         const transaction = id?.transaction?.trim()
         const source = id?.source?.trim()
         const target = id?.target?.trim()
         const database = id?.database?.trim()
-        const force = document?.force
 
         if (StringHelper.empty(transaction)) { throw new BadRequestError('transaction is missing') }
         if (StringHelper.empty(source)) { throw new BadRequestError('source is empty') }
         if (StringHelper.empty(target)) { throw new BadRequestError('target is empty') }
         if (StringHelper.empty(database)) { throw new BadRequestError('database id is empty') }
-        if (!ObjectHelper.has(force)) { throw new BadRequestError('force is empty') }
 
         const service = Regex.inject(SourceService)
         const found = await service.get({ id: { name: source } }) as Source
@@ -96,16 +84,12 @@ export class ExportTaskRetryService {
 
         const tasks = Regex.inject(ExportTaskService)
 
-        const $or: Filter<ExportTask>[] = force
-            ? [{ status: 'error' }, { status: 'stopped' }]
-            : [{ status: 'error' }]
-
         const exists = await tasks.exists({
             context,
-            filter: { transaction, source, target, database, $or }
+            filter: { transaction, source, target, database, status: 'stopped' }
         })
 
-        if (!exists) { throw new BadRequestError(`there is not export tasks to retry for export "${exports.name(id)}"`) }
+        if (!exists) { throw new BadRequestError(`there is not export tasks to play for export "${exports.name(id)}"`) }
 
     }
 

@@ -27,6 +27,8 @@ import { ExportTaskFinishService } from './services/export/task/finish.service'
 import { ExportTaskRetryService } from './services/export/task/retry.service'
 import { ExportTaskStartService } from './services/export/task/start.service'
 import { ExportTaskStopService } from './services/export/task/stop.service'
+import { ExportPlayService } from './services/export/play.service'
+import { ExportTaskPlayService } from './services/export/task/play.service'
 
 EnvironmentHelper.config()
 MetricHelper.config()
@@ -41,6 +43,7 @@ Regex.register(ExportService)
 Regex.register(ExportCreateService)
 Regex.register(ExportErrorService)
 Regex.register(ExportFinishService)
+Regex.register(ExportPlayService)
 Regex.register(ExportRetryService)
 Regex.register(ExportStartService)
 Regex.register(ExportStopService)
@@ -48,6 +51,7 @@ Regex.register(ExportTaskService)
 Regex.register(ExportTaskCreateService)
 Regex.register(ExportTaskErrorService)
 Regex.register(ExportTaskFinishService)
+Regex.register(ExportTaskPlayService)
 Regex.register(ExportTaskRetryService)
 Regex.register(ExportTaskStartService)
 Regex.register(ExportTaskStopService)

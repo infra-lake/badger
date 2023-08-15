@@ -10,15 +10,14 @@ import { StringHelper } from '../../helpers/string.helper'
 import { Regex, TransactionalContext } from '../../regex'
 import { SettingsService } from '../settings.service'
 import { Export, ExportService } from './service'
-import { ExportTaskRetryService } from './task/retry.service'
+import { ExportTaskPlayService } from './task/play.service'
 
-export type ExportRetryInput = {
+export type ExportPlayInput = {
     context: TransactionalContext
-    id: Required<Pick<Export, 'transaction' | 'source' | 'target' | 'database'>>,
-    document: { force: boolean }
+    id: Required<Pick<Export, 'transaction' | 'source' | 'target' | 'database'>>
 }
 
-export class ExportRetryService {
+export class ExportPlayService {
 
     private get collection() {
         const client = Regex.inject(MongoClient)
@@ -26,19 +25,17 @@ export class ExportRetryService {
         return client.db(SettingsService.DATABASE).collection(service.collection)
     }
 
-    public async apply(input: ExportRetryInput) {
+    public async apply(input: ExportPlayInput) {
 
         await this.validate(input)
 
-        const { context, id, document } = input
+        const { context, id } = input
         const { transaction, source, target, database } = id
-        const { force } = document
 
-        const retry = Regex.inject(ExportTaskRetryService)
-        await retry.apply({
+        const play = Regex.inject(ExportTaskPlayService)
+        await play.apply({
             context,
-            id: { transaction, source, target, database },
-            document: { force }
+            id: { transaction, source, target, database }
         })
 
         const status = 'created'
@@ -47,15 +44,8 @@ export class ExportRetryService {
 
         context.logger.log(`setting status "${status}" to export "${exports.name(id)}"`)
 
-        const filter = force
-            ? {
-                transaction, source, target, database,
-                $or: [{ status: 'error' }, { status: 'stopped' }]
-            }
-            : { transaction, source, target, database, status: 'error' }
-
         const result = await this.collection.findOneAndUpdate(
-            filter,
+            { transaction, source, target, database, status: 'stopped' },
             { $set: { status } },
             { upsert: false, returnDocument: 'after' }
         )
@@ -66,31 +56,28 @@ export class ExportRetryService {
 
     }
 
-    public async validate(input: ExportRetryInput) {
+    public async validate(input: ExportPlayInput) {
 
         if (![ApplicationMode.MANAGER, ApplicationMode.MONOLITH].includes(ApplicationHelper.MODE)) {
-            throw new UnsupportedOperationError(ExportRetryService.name)
+            throw new UnsupportedOperationError(ExportPlayService.name)
         }
 
         if (!ObjectHelper.has(input)) { throw new InvalidParameterError('input') }
 
-        const { context, id, document } = input
+        const { context, id } = input
 
         if (!ObjectHelper.has(context)) { throw new InvalidParameterError('context') }
         if (!ObjectHelper.has(id)) { throw new InvalidParameterError('id') }
-        if (!ObjectHelper.has(document)) { throw new InvalidParameterError('document') }
 
         const transaction = id?.transaction?.trim()
         const source = id?.source?.trim()
         const target = id?.target?.trim()
         const database = id?.database?.trim()
-        const force = document?.force
 
         if (StringHelper.empty(transaction)) { throw new BadRequestError('transaction is missing') }
         if (StringHelper.empty(source)) { throw new BadRequestError('source is empty') }
         if (StringHelper.empty(target)) { throw new BadRequestError('target is empty') }
         if (StringHelper.empty(database)) { throw new BadRequestError('database id is empty') }
-        if (!ObjectHelper.has(force)) { throw new BadRequestError('force is empty') }
 
         const service = Regex.inject(ExportService)
         const found = await service.get({ id: { transaction, source, target, database } }) as Export
@@ -98,13 +85,12 @@ export class ExportRetryService {
         const { status: old } = found
         if (StringHelper.empty(old)) { throw new BadRequestError('service.status') }
 
-        const valids: Array<Export['status']> = force ? ['error', 'stopped'] : ['error']
+        const valids: Array<Export['status']> = ['stopped']
         if (!valids.includes(old)) {
-            const type = ExportRetryService.name
+            const type = ExportPlayService.name
             const status: InvalidStateChangeErrorInputStatus = { old, new: 'created', valids }
-            throw new InvalidStateChangeError({ type, on: 'retry', status })
+            throw new InvalidStateChangeError({ type, on: 'play', status })
         }
-
 
     }
 
