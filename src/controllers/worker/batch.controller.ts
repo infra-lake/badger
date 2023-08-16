@@ -158,13 +158,13 @@ export class WorkerBatchController implements RegexBatchController {
 
     private row({ chunk, date }: WorkerRowInput) {
 
-        const data = JSON.stringify(DeserializationHelper.fix(chunk))
+        const data = DeserializationHelper.fix(chunk)
 
         return {
             [StampsHelper.DEFAULT_STAMP_ID]: chunk[StampsHelper.DEFAULT_STAMP_ID].toString(),
             [StampsHelper.DEFAULT_STAMP_INSERT]: new BigQueryTimestamp(date).value,
             data,
-            hash: createHash('md5').update(data).digest('hex')
+            hash: createHash('md5').update(JSON.stringify(data)).digest('hex')
         }
 
     }
