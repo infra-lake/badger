@@ -16,7 +16,7 @@ import { ExportTask, ExportTaskService } from './service'
 export type ExportTaskErrorInput = {
     context: TransactionalContext
     id: Required<Pick<ExportTask, 'transaction' | 'source' | 'target' | 'database' | 'collection'>>
-    document: Required<Pick<ExportTask, 'worker' | 'date' | 'error'>>
+    document: Required<Pick<ExportTask, 'worker' | 'error'>>
 }
 
 export class ExportTaskErrorService {
@@ -33,7 +33,7 @@ export class ExportTaskErrorService {
 
         const { context, id, document } = input
         const { transaction, source, target, database, collection } = id
-        const { worker, date, error } = document
+        const { worker, error } = document
 
         const status = 'error'
 
@@ -43,7 +43,7 @@ export class ExportTaskErrorService {
 
         const result = await this.collection.findOneAndUpdate(
             { transaction, source, target, database, collection, worker, $or: [{ status: 'created' }, { status: 'running' }] },
-            { $set: { status, date, error } },
+            { $set: { status, error, updatedAt: new Date() } },
             { upsert: false, returnDocument: 'after' }
         )
 
@@ -73,7 +73,6 @@ export class ExportTaskErrorService {
         const database = id?.database?.trim()
         const collection = id?.collection?.trim()
         const worker = document?.worker?.trim()
-        const date = document?.date
         const error = document?.error
 
         if (StringHelper.empty(transaction)) { throw new BadRequestError('transaction is missing') }
@@ -82,7 +81,6 @@ export class ExportTaskErrorService {
         if (StringHelper.empty(database)) { throw new BadRequestError('database is empty') }
         if (StringHelper.empty(collection)) { throw new BadRequestError('collection is empty') }
         if (StringHelper.empty(worker)) { throw new BadRequestError('worker is empty') }
-        if (!DateHelper.valid(date)) { throw new InvalidParameterError('date') }
         if (!ObjectHelper.has(error)) { throw new InvalidParameterError('error') }
 
         const tasks = Regex.inject(ExportTaskService)

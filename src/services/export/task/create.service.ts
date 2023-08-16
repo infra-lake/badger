@@ -38,6 +38,8 @@ export class ExportTaskCreateService {
             const service = Regex.inject(SourceService)
             const collections = await service.collections({ name: source, database })
 
+            const createdAt = new Date()
+
             await Promise.all(collections.map(async ({ collection }) => {
 
                 await this.validate({ context, id: { transaction, source, target, database, collection } })
@@ -50,7 +52,7 @@ export class ExportTaskCreateService {
 
                 const result = await this.collection.findOneAndUpdate(
                     { source, target, database, collection, $or: [{ status: 'created' }, { status: 'running' }] },
-                    { $setOnInsert: { transaction, source, target, database, collection, status } },
+                    { $setOnInsert: { transaction, source, target, database, collection, status, createdAt } },
                     { upsert: true, returnDocument: 'after' }
                 )
 

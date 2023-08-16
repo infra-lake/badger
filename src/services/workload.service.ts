@@ -71,13 +71,9 @@ export class Workload {
 
     public get count() { return this.task.count ?? 0 }
 
-    public get date(): Date | undefined { return this.task.date }
+    public async update(count: number) {
 
-    public async update(date: Date, count: number, error?: Error) {
-
-        this.task.date = date
         this.task.count = count
-        this.task.error = error
 
         const id = {
             transaction: this.task.transaction,
@@ -88,11 +84,7 @@ export class Workload {
         }
 
         const document = {
-            status: this.task.status,
-            worker: this.task.worker,
-            date: this.task.date,
-            count: this.task.count,
-            error: this.task.error
+            count: this.task.count
         }
 
         await this.service.save({ context: this.context, id, document })
@@ -110,9 +102,7 @@ export class Workload {
         }
 
         const document = {
-            worker: this.worker,
-            date: this.context.date,
-            count: this.count
+            worker: this.worker
         }
 
         await this.consolidate()
@@ -196,8 +186,6 @@ export class Workload {
 
         const document = {
             worker: this.worker,
-            date: this.context.date,
-            count: this.count,
             error: cause
         }
 

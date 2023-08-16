@@ -35,8 +35,7 @@ export class ExportStopService {
         const stop = Regex.inject(ExportTaskStopService)
         await stop.apply({
             context,
-            id: { transaction, source, target, database },
-            document: { date: new Date() }
+            id: { transaction, source, target, database }
         })
 
         const status = 'stopped'

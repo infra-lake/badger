@@ -13,6 +13,7 @@ import { Source, SourceService } from '../../source.service'
 import { Export } from '../service'
 import { ExportStartService } from '../start.service'
 import { ExportTask, ExportTaskService } from './service'
+import { DateHelper } from '../../../helpers/date.helper'
 
 export type ExportTaskStartInput = {
     context: TransactionalContext
@@ -47,7 +48,7 @@ export class ExportTaskStartService {
                 transaction, source, target, database, collection, status: 'created',
                 $or: [{ worker: { $exists: false } }, { worker: { $type: BSONType.null } }]
             },
-            { $set: { status, worker } },
+            { $set: { status, worker, updatedAt: new Date() } },
             { upsert: false, returnDocument: 'after' }
         )
 

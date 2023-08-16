@@ -57,6 +57,12 @@ export class VoterBatchController implements RegexBatchController {
                 await start.apply({ context: message, id })
             }
 
+            const count = await tasks.count({ context: message, filter: { transaction, source, target, database } })
+            if (count <= 0) {
+                const start = Regex.inject(ExportStartService)
+                await start.apply({ context: message, id })
+            }
+
         }
         await cursor2.close()
 

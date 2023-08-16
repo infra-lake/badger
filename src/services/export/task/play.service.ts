@@ -11,6 +11,7 @@ import { Export, ExportService } from '../service'
 import { SettingsService } from '../../settings.service'
 import { ExportTask, ExportTaskService } from './service'
 import { Source, SourceService } from '../../source.service'
+import { DateHelper } from '../../../helpers/date.helper'
 
 export type ExportTaskPlayInput = {
     context: TransactionalContext
@@ -40,7 +41,7 @@ export class ExportTaskPlayService {
         
         await this.collection.updateMany(
             { transaction, source, target, database, status },
-            { $set: { status: 'created', worker: null, date: null, error: null } },
+            { $set: { status: 'created', worker: null, error: null, updatedAt: new Date() } },
             { upsert: false }
         )
 

@@ -11,6 +11,7 @@ import { Export, ExportService } from '../service'
 import { SettingsService } from '../../settings.service'
 import { ExportTask, ExportTaskService } from './service'
 import { Source, SourceService } from '../../source.service'
+import { DateHelper } from '../../../helpers/date.helper'
 
 export type ExportTaskRetryInput = {
     context: TransactionalContext
@@ -49,7 +50,7 @@ export class ExportTaskRetryService {
 
         await this.collection.updateMany(
             filter,
-            { $set: { status: 'created', worker: null, date: null, error: null } },
+            { $set: { status: 'created' , worker: null, error: null, updatedAt: new Date() } },
             { upsert: false }
         )
 

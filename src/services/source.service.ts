@@ -5,7 +5,7 @@ import { StringHelper } from '../helpers/string.helper'
 import { Export, ExportService } from './export/service'
 import { SettingsService } from './settings.service'
 import { BatchIncomingMessage } from '../regex/batch'
-import { ExportTask } from './export/task/service'
+import { ExportTask, ExportTaskService } from './export/task/service'
 import { Regex } from '../regex'
 import { StampsHelper } from '../helpers/stamps.helper'
 
@@ -72,7 +72,7 @@ export class SourceService extends MongoDBService<Source, 'name'> {
 
     public async source({ context, task }: SourceInput): Promise<SourceOutput> {
 
-        const { source, target, database, collection, date } = task
+        const { transaction, source, target, database, collection, status, worker } = task
 
         const sources = Regex.inject(SourceService)
         
@@ -81,9 +81,17 @@ export class SourceService extends MongoDBService<Source, 'name'> {
         context.logger.debug('connected to source', source, 'successfully !!!')
         
         context.logger.debug('defining window range...')
-        const begin = date ?? await this.last({ source, target, database, collection })
+
+        const tasks = Regex.inject(ExportTaskService)
+        const begin = await tasks.last({ source, target, database, collection })
         const end = context.date        
         const window = { begin, end }
+        await tasks.save({ 
+            context, 
+            id: { transaction, source, target, database, collection }, 
+            document: { window } 
+        })
+
         context.logger.debug('window range defined:', window)
         
         const filter = ExportService.filter(window)
@@ -111,27 +119,6 @@ export class SourceService extends MongoDBService<Source, 'name'> {
         }
 
         return { name: source, count, find }
-
-    }
-
-    private async last({ source, target, database, collection }: Pick<ExportTask, 'source' | 'target' | 'database' | 'collection'>): Promise<Date> {
-
-        const cursor = this._collection.aggregate([
-            { $match: { source, target, database, collection, status: 'terminated' } },
-            {
-                $group: {
-                    _id: { source: "$source", target: "$target", database: "$database", collection: "$collection" },
-                    value: { $max: "$date" }
-                }
-            }
-        ])
-
-        if (await cursor.hasNext()) {
-            const { value } = await cursor.next() as any;
-            return value
-        }
-
-        return new Date(0)
 
     }
 

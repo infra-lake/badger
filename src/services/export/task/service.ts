@@ -2,6 +2,7 @@ import { UnsupportedOperationError } from "../../../exceptions/unsupported-opera
 import { ApplicationHelper, ApplicationMode } from "../../../helpers/application.helper"
 import { MongoDBDocument, MongoDBService, MongoDBValidationInput } from "../../../helpers/mongodb.helper"
 import { StringHelper } from "../../../helpers/string.helper"
+import { Window } from "../../../helpers/window.helper"
 import { Worker } from "../../../helpers/worker.helper"
 import { TransactionalContext } from "../../../regex"
 import { SettingsService } from "../../settings.service"
@@ -15,9 +16,9 @@ export interface ExportTask extends MongoDBDocument<ExportTask, 'transaction' | 
     collection: string
     status: Export['status']
     worker?: Worker['name']
-    date?: Date
     error?: any
     count?: number
+    window?: Window
 }
 
 export type ExportTaskFromOutput = Pick<ExportTaskStateChangeInput, 'id'>
@@ -61,6 +62,27 @@ export class ExportTaskService extends MongoDBService<ExportTask, 'transaction' 
 
     public async cleanup() {
         await this._collection.deleteMany({})
+    }
+
+    public async last({ source, target, database, collection }: Pick<ExportTask, 'source' | 'target' | 'database' | 'collection'>): Promise<Date> {
+
+        const cursor = this._collection.aggregate([
+            { $match: { source, target, database, collection, status: 'terminated' } },
+            {
+                $group: {
+                    _id: { source: "$source", target: "$target", database: "$database", collection: "$collection" },
+                    value: { $max: "$window.end" }
+                }
+            }
+        ])
+
+        if (await cursor.hasNext()) {
+            const { value } = await cursor.next() as any;
+            return value ?? new Date(0)
+        }
+
+        return new Date(0)
+
     }
 
 }

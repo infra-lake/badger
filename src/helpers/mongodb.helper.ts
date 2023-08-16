@@ -131,16 +131,17 @@ export class MongoDBHelper {
         return result
     }
 
-    public static async save<T extends MongoDBDocument<T, K>, K extends keyof T>({ client, database, collection, id, document, validate }: MongoDBSaveInput<T, K>) {
+    public static async save<T extends MongoDBDocument<T, K>, K extends keyof T>({ context, client, database, collection, id, document, validate }: MongoDBSaveInput<T, K>) {
         if (await MongoDBHelper.exists({ client, database, collection, filter: id as any })) {
             await validate({ id: id as Pick<T, K>, document, on: 'update' })
-            const replacement = { ...document, ...id }
-            delete replacement['_id']
-            await client.db(database).collection<T>(collection).findOneAndReplace(id, { ...document, ...id } as WithoutId<T>, { upsert: true })
+            const found = await MongoDBHelper.get({ context, client, database, collection, id })
+            const updated = { ...found, ...document, ...id, updatedAt: new Date() } as WithoutId<T>
+            delete updated['_id']
+            await client.db(database).collection<T>(collection).findOneAndReplace(id, updated, { upsert: true })
             return
         }
         await validate({ id: id as Pick<T, K>, document, on: 'insert' })
-        await client.db(database).collection<T>(collection).insertOne({ ...document, ...id } as OptionalUnlessRequiredId<T>)
+        await client.db(database).collection<T>(collection).insertOne({ ...document, ...id, createdAt: new Date() } as any as OptionalUnlessRequiredId<T>)
     }
 
     public static async delete<T extends MongoDBDocument<T, K>, K extends keyof T>({ client, database, collection, id, validate }: MongoDBDeleteInput<T, K>) {

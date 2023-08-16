@@ -14,7 +14,6 @@ import { ExportTask, ExportTaskService } from './service'
 export type ExportTaskStopInput = {
     context: TransactionalContext
     id: Required<Pick<ExportTask, 'transaction' | 'source' | 'target' | 'database'>>
-    document: Required<Pick<ExportTask, 'date'>>
 }
 
 export class ExportTaskStopService {
@@ -29,9 +28,8 @@ export class ExportTaskStopService {
 
         await this.validate(input)
 
-        const { context, id, document } = input
+        const { context, id } = input
         const { transaction, source, target, database } = id
-        const { date } = document
 
         const status = 'stopped'
 
@@ -44,7 +42,7 @@ export class ExportTaskStopService {
                 transaction, source, target, database,
                 $or: [{ status: 'created' }, { status: 'running' }]
             },
-            { $set: { status, date } },
+            { $set: { status, updatedAt: new Date() } },
             { upsert: false }
         )
 
@@ -58,23 +56,20 @@ export class ExportTaskStopService {
 
         if (!ObjectHelper.has(input)) { throw new InvalidParameterError('input') }
 
-        const { context, id, document } = input
+        const { context, id } = input
 
         if (!ObjectHelper.has(context)) { throw new InvalidParameterError('context') }
         if (!ObjectHelper.has(id)) { throw new InvalidParameterError('id') }
-        if (!ObjectHelper.has(document)) { throw new InvalidParameterError('document') }
 
         const transaction = id?.transaction?.trim()
         const source = id?.source?.trim()
         const target = id?.target?.trim()
         const database = id?.database?.trim()
-        const date = document?.date
 
         if (StringHelper.empty(transaction)) { throw new BadRequestError('transaction is missing') }
         if (StringHelper.empty(source)) { throw new BadRequestError('source is empty') }
         if (StringHelper.empty(target)) { throw new BadRequestError('target is empty') }
         if (StringHelper.empty(database)) { throw new BadRequestError('database id is empty') }
-        if (!DateHelper.valid(date)) { throw new InvalidParameterError('date') }
 
         const tasks = Regex.inject(ExportTaskService)
         const exists = await tasks.exists({

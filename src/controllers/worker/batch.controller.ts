@@ -92,6 +92,10 @@ export class WorkerBatchController implements RegexBatchController {
             await workload.finish()
             return
         }
+        
+        context.logger.debug('updating count on export task...')
+        await workload.update(count)
+        context.logger.debug('count on task was successfully updated!')
 
         context.logger.log('starting export task "', JSON.parse(workload.name), '" at "', context.date.toISOString(), '"')
 
@@ -137,17 +141,10 @@ export class WorkerBatchController implements RegexBatchController {
         }
 
         context.logger.debug('loading documents on temp file to bigquery...')
-
         await workload.target.table.temporary.load(`${tempdir}/${tempfile}`, workload.target.table.temporary.metadata)
-
         context.logger.debug('documents load to bigquery successfully!!!')
-        context.logger.debug('updating export task...')
         
-        await workload.update(context.date, count)
-
-        context.logger.debug('task successfully updated!')
         context.logger.debug('removing temp file:', `${tempdir}/${tempfile}`)
-
         rmSync(`${tempdir}/${tempfile}`, { force: true, recursive: true })
 
         await workload.finish()
