@@ -12,6 +12,7 @@ import { SettingsService } from '../../settings.service'
 import { ExportTask, ExportTaskService } from './service'
 import { Source, SourceService } from '../../source.service'
 import { DateHelper } from '../../../helpers/date.helper'
+import { StampsHelper } from '../../../helpers/stamps.helper'
 
 export type ExportTaskRetryInput = {
     context: TransactionalContext
@@ -50,7 +51,7 @@ export class ExportTaskRetryService {
 
         await this.collection.updateMany(
             filter,
-            { $set: { status: 'created' , worker: null, error: null, updatedAt: new Date() } },
+            { $set: { status: 'created' , worker: null, error: null, [StampsHelper.DEFAULT_STAMP_UPDATE]: new Date() } },
             { upsert: false }
         )
 

@@ -14,6 +14,7 @@ import { Export } from '../service'
 import { ExportStartService } from '../start.service'
 import { ExportTask, ExportTaskService } from './service'
 import { DateHelper } from '../../../helpers/date.helper'
+import { StampsHelper } from '../../../helpers/stamps.helper'
 
 export type ExportTaskStartInput = {
     context: TransactionalContext
@@ -48,7 +49,7 @@ export class ExportTaskStartService {
                 transaction, source, target, database, collection, status: 'created',
                 $or: [{ worker: { $exists: false } }, { worker: { $type: BSONType.null } }]
             },
-            { $set: { status, worker, updatedAt: new Date() } },
+            { $set: { status, worker, [StampsHelper.DEFAULT_STAMP_UPDATE]: new Date() } },
             { upsert: false, returnDocument: 'after' }
         )
 

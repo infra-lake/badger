@@ -3,6 +3,7 @@ import { BadRequestError } from '../exceptions/bad-request.error'
 import { Regex, TransactionalContext } from '../regex'
 import { ApplicationHelper } from './application.helper'
 import { ObjectHelper } from './object.helper'
+import { StampsHelper } from './stamps.helper'
 
 export type MongoDBDatabasesInput = { client: MongoClient }
 export type MongoDBCollectionsInput = { client: MongoClient, database: string }
@@ -135,13 +136,13 @@ export class MongoDBHelper {
         if (await MongoDBHelper.exists({ client, database, collection, filter: id as any })) {
             await validate({ id: id as Pick<T, K>, document, on: 'update' })
             const found = await MongoDBHelper.get({ context, client, database, collection, id })
-            const updated = { ...found, ...document, ...id, updatedAt: new Date() } as WithoutId<T>
+            const updated = { ...found, ...document, ...id, [StampsHelper.DEFAULT_STAMP_UPDATE]: new Date() } as WithoutId<T>
             delete updated['_id']
             await client.db(database).collection<T>(collection).findOneAndReplace(id, updated, { upsert: true })
             return
         }
         await validate({ id: id as Pick<T, K>, document, on: 'insert' })
-        await client.db(database).collection<T>(collection).insertOne({ ...document, ...id, createdAt: new Date() } as any as OptionalUnlessRequiredId<T>)
+        await client.db(database).collection<T>(collection).insertOne({ ...document, ...id, [StampsHelper.DEFAULT_STAMP_INSERT]: new Date() } as any as OptionalUnlessRequiredId<T>)
     }
 
     public static async delete<T extends MongoDBDocument<T, K>, K extends keyof T>({ client, database, collection, id, validate }: MongoDBDeleteInput<T, K>) {

@@ -4,6 +4,7 @@ import { InvalidParameterError } from '../../../exceptions/invalid-parameter.err
 import { UnsupportedOperationError } from '../../../exceptions/unsupported-operation.error'
 import { ApplicationHelper, ApplicationMode } from '../../../helpers/application.helper'
 import { ObjectHelper } from '../../../helpers/object.helper'
+import { StampsHelper } from '../../../helpers/stamps.helper'
 import { StringHelper } from '../../../helpers/string.helper'
 import { Regex, TransactionalContext } from '../../../regex'
 import { SettingsService } from '../../settings.service'
@@ -38,8 +39,6 @@ export class ExportTaskCreateService {
             const service = Regex.inject(SourceService)
             const collections = await service.collections({ name: source, database })
 
-            const createdAt = new Date()
-
             await Promise.all(collections.map(async ({ collection }) => {
 
                 await this.validate({ context, id: { transaction, source, target, database, collection } })
@@ -52,7 +51,7 @@ export class ExportTaskCreateService {
 
                 const result = await this.collection.findOneAndUpdate(
                     { source, target, database, collection, $or: [{ status: 'created' }, { status: 'running' }] },
-                    { $setOnInsert: { transaction, source, target, database, collection, status, createdAt } },
+                    { $setOnInsert: { transaction, source, target, database, collection, status, [StampsHelper.DEFAULT_STAMP_INSERT]: new Date() } },
                     { upsert: true, returnDocument: 'after' }
                 )
 

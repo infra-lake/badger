@@ -12,6 +12,7 @@ import { Regex, TransactionalContext } from '../../../regex'
 import { SettingsService } from '../../settings.service'
 import { Export } from '../service'
 import { ExportTask, ExportTaskService } from './service'
+import { StampsHelper } from '../../../helpers/stamps.helper'
 
 export type ExportTaskErrorInput = {
     context: TransactionalContext
@@ -43,7 +44,7 @@ export class ExportTaskErrorService {
 
         const result = await this.collection.findOneAndUpdate(
             { transaction, source, target, database, collection, worker, $or: [{ status: 'created' }, { status: 'running' }] },
-            { $set: { status, error, updatedAt: new Date() } },
+            { $set: { status, error, [StampsHelper.DEFAULT_STAMP_UPDATE]: new Date() } },
             { upsert: false, returnDocument: 'after' }
         )
 

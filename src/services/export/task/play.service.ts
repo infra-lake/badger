@@ -12,6 +12,7 @@ import { SettingsService } from '../../settings.service'
 import { ExportTask, ExportTaskService } from './service'
 import { Source, SourceService } from '../../source.service'
 import { DateHelper } from '../../../helpers/date.helper'
+import { StampsHelper } from '../../../helpers/stamps.helper'
 
 export type ExportTaskPlayInput = {
     context: TransactionalContext
@@ -41,7 +42,7 @@ export class ExportTaskPlayService {
         
         await this.collection.updateMany(
             { transaction, source, target, database, status },
-            { $set: { status: 'created', worker: null, error: null, updatedAt: new Date() } },
+            { $set: { status: 'created', worker: null, error: null, [StampsHelper.DEFAULT_STAMP_UPDATE]: new Date() } },
             { upsert: false }
         )
 

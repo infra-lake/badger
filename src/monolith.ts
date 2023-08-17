@@ -8,6 +8,7 @@ import { SettingsService } from './services/settings.service'
 import { MetricHelper } from './helpers/metric.helper'
 import { EnvironmentHelper } from './helpers/environment.helper'
 import { WorkerHelper } from './helpers/worker.helper'
+import { StampsHelper } from './helpers/stamps.helper'
 
 export async function startup({ logger, http, batch }: StartupInput) {
 
@@ -28,10 +29,10 @@ export async function startup({ logger, http, batch }: StartupInput) {
             ignore_collections: EnvironmentHelper.get('IGNORE_COLLECTIONS'),
             auth_mode: EnvironmentHelper.get('AUTH_MODE'),
             mongodb_database: EnvironmentHelper.get('MONGODB_DATABASE'),
-            default_stamp_insert: EnvironmentHelper.get('DEFAULT_STAMP_INSERT'),
-            default_stamp_update: EnvironmentHelper.get('DEFAULT_STAMP_UPDATE'),
-            default_stamp_id: EnvironmentHelper.get('DEFAULT_STAMP_ID'),
-            default_stamp_dataset_name_prefix: EnvironmentHelper.get('DEFAULT_STAMP_DATASET_NAME_PREFIX'),
+            default_stamp_insert: StampsHelper.DEFAULT_STAMP_INSERT,
+            default_stamp_update: StampsHelper.DEFAULT_STAMP_UPDATE,
+            default_stamp_id: StampsHelper.DEFAULT_STAMP_ID,
+            default_stamp_dataset_name_prefix: StampsHelper.DEFAULT_STAMP_DATASET_NAME_PREFIX,
             voter_url: EnvironmentHelper.get('VOTER_URL'),
             worker_name: WorkerHelper.CURRENT
         }

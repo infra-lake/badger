@@ -10,6 +10,7 @@ import { Regex, TransactionalContext } from '../../../regex'
 import { SettingsService } from '../../settings.service'
 import { ExportService } from '../service'
 import { ExportTask, ExportTaskService } from './service'
+import { StampsHelper } from '../../../helpers/stamps.helper'
 
 export type ExportTaskStopInput = {
     context: TransactionalContext
@@ -42,7 +43,7 @@ export class ExportTaskStopService {
                 transaction, source, target, database,
                 $or: [{ status: 'created' }, { status: 'running' }]
             },
-            { $set: { status, updatedAt: new Date() } },
+            { $set: { status, [StampsHelper.DEFAULT_STAMP_UPDATE]: new Date() } },
             { upsert: false }
         )
 
