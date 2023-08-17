@@ -11,6 +11,7 @@ import { Regex, TransactionalContext } from '../../regex'
 import { SettingsService } from '../settings.service'
 import { Export, ExportService } from './service'
 import { ExportTaskPlayService } from './task/play.service'
+import { StampsHelper } from '../../helpers/stamps.helper'
 
 export type ExportPlayInput = {
     context: TransactionalContext
@@ -46,7 +47,7 @@ export class ExportPlayService {
 
         const result = await this.collection.findOneAndUpdate(
             { transaction, source, target, database, status: 'stopped' },
-            { $set: { status } },
+            { $set: { status, [StampsHelper.DEFAULT_STAMP_UPDATE]: new Date() } },
             { upsert: false, returnDocument: 'after' }
         )
 

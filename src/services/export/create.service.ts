@@ -12,6 +12,7 @@ import { Source, SourceService } from '../source.service'
 import { Target, TargetService } from '../target.service'
 import { Export, ExportService } from './service'
 import { ExportTaskCreateService } from './task/create.service'
+import { StampsHelper } from '../../helpers/stamps.helper'
 
 export type ExportCreateInput = {
     context: TransactionalContext
@@ -41,7 +42,7 @@ export class ExportCreateService {
 
         const result = await this.collection.findOneAndUpdate(
             { source, target, database, $or: [{ status: 'created' }, { status: 'running' }] },
-            { $setOnInsert: { transaction, source, target, database, status } },
+            { $setOnInsert: { transaction, source, target, database, status, [StampsHelper.DEFAULT_STAMP_INSERT]: new Date() } },
             { upsert: true, returnDocument: 'after' }
         )
 

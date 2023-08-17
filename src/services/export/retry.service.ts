@@ -11,6 +11,7 @@ import { Regex, TransactionalContext } from '../../regex'
 import { SettingsService } from '../settings.service'
 import { Export, ExportService } from './service'
 import { ExportTaskRetryService } from './task/retry.service'
+import { StampsHelper } from '../../helpers/stamps.helper'
 
 export type ExportRetryInput = {
     context: TransactionalContext
@@ -56,7 +57,7 @@ export class ExportRetryService {
 
         const result = await this.collection.findOneAndUpdate(
             filter,
-            { $set: { status } },
+            { $set: { status, [StampsHelper.DEFAULT_STAMP_UPDATE]: new Date() } },
             { upsert: false, returnDocument: 'after' }
         )
 
