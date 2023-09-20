@@ -37,11 +37,18 @@ export class HTTPHelper {
 
         if (request.logger.mode === LogMode.DEBUG) {
             const { headers } = request
-            request.logger.debug('received headers:', { headers })
+            if (HTTPHelper.isLoggablePath(request)) {
+                request.logger.debug('received headers:', { headers })
+            }
         }
 
         return request
 
+    }
+
+    public static isLoggablePath(request: HTTPIncomingMessage) {
+        const { pathname } = request.getURL()
+        return !['/favicon.ico', '/health/liveness', '/health/readiness', '/metrics'].includes(pathname)
     }
 
     public static response(response: http.ServerResponse): HTTPServerResponse {

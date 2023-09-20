@@ -53,7 +53,11 @@ async function listener(request: IncomingMessage, response: ServerResponse) {
     try {
         
         const qs = QueryStringHelper.parse({ value: searchParams, mode: 'raw' }) 
-        _request.logger.log('call', method, 'on', pathname, ObjectHelper.empty(qs) ? '' : qs)
+        
+        if (HTTPHelper.isLoggablePath(_request)) {
+            _request.logger.log('call', method, 'on', pathname, ObjectHelper.empty(qs) ? '' : qs)            
+        }
+
         MetricHelper.http_received_request_total.inc()
         MetricHelper.http_received_request_total.inc({ path: pathname })
 

@@ -1,11 +1,11 @@
 {
   "name": "badger",
-  "version": "2.0.22",
+  "version": "2.0.23",
   "description": "Badger is a tool that export MongoDB data to Google BigQuery",
   "main": "src/index.mjs",
   "scripts": {
     "build": "rm -rf dist;tsc",
-    "start": "make up;nodemon --watch src/ --ext ts,json --exec \"npm run build; node dist/index.js\"",
+    "start": "make up;nodemon --watch src/ --ext ts,json --exec \"npm run build; node --inspect dist/index.js\"",
     "test": "jest --detectOpenHandles"
   },
   "repository": {
