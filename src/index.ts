@@ -5,7 +5,7 @@ import { NotFoundController } from './controllers/common/not-found.controller'
 import { ApplicationHelper, ApplicationMode } from './helpers/application.helper'
 import { EnvironmentHelper } from './helpers/environment.helper'
 import { MetricHelper } from './helpers/metric.helper'
-import { Regex, RegexApplication } from './regex'
+import { Logger, Regex, RegexApplication } from './regex'
 import { ExportService } from './services/export/service'
 import { SettingsService } from './services/settings.service'
 import { SourceService } from './services/source.service'
@@ -65,5 +65,15 @@ Regex.controller(MetricsController)
 
 RegexApplication.create({
     settings: { http: true, batch: [ApplicationMode.MONOLITH, ApplicationMode.VOTER, ApplicationMode.WORKER].includes(ApplicationHelper.MODE) },
-    startup: { module: `${__dirname}/${ApplicationHelper.MODE}` }
+    startup: { module: `${__dirname}/${ApplicationHelper.MODE}` },
+    shutdown: (signal: NodeJS.Signals) => {
+        const logger = Regex.register(Logger)
+        try {
+            logger.log('shutting down...', { signal })
+        } catch (error) {
+            logger.error('unexpected error:', error)
+        } finally {
+            Regex.unregister(logger)
+        }
+    }
 })

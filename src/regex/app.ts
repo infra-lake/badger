@@ -9,7 +9,7 @@ import { Batch, BatchBootstrapOutput, BatchManager } from './batch'
 export type Settings = { http?: boolean, batch?: boolean }
 export type StartupInput = ({ logger: Logger, http?: HTTPBootstrapOutput, batch?: BatchBootstrapOutput })
 export type Startup = ((input: StartupInput) => Promise<void>) | ((input: StartupInput) => void) | { module: string }
-export type Shutdown = (() => Promise<void>) | (() => void) | { module: string } | undefined
+export type Shutdown = ((signal: NodeJS.Signals) => Promise<void>) | ((signal: NodeJS.Signals) => void) | { module: string } | undefined
 export type RegexAppCreateInput = { settings: Settings, startup: Startup, shutdown?: Shutdown }
 
 export class RegexApplication {
@@ -71,16 +71,16 @@ export class RegexApplication {
 
 function exit({ batch }: StartupInput, shutdown: Shutdown) {
 
-    return async () => {
+    return async (signal: NodeJS.Signals) => {
         
         await batch?.manager.stop()
         
         if (shutdown) {
             if (typeof shutdown === 'function') {
-                await shutdown()
+                await shutdown(signal)
             } else {
                 const { shutdown: _shutdown } = await import(shutdown.module)
-                await _shutdown()
+                await _shutdown(signal)
             }
         }
 
