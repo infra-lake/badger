@@ -1,13 +1,60 @@
 {
-    "sqltools.useNodeRuntime": true,
-    "sqltools.connections": [
-        {
-            "name": "poc-project2",
-            "authenticator": "SERVICE_ACCOUNT",
-            "location": "us",
-            "previewLimit": 50,
-            "driver": "BigQuery",
-            "keyfile": "/home/herberton/Projects/opensource/github/infralake/badger/key.json"
-        }
+    "eslint.format.enable": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    "editor.detectIndentation": false,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "material-icon-theme.activeIconPack": "nest",
+    "material-icon-theme.files.associations": {
+        "*.config.service.ts": "settings",
+        "*.dto.ts": "typescript-def",
+        "*.schema.ts": "todo",
+        "*.entity.ts": "mint",
+        "*.repository.ts": "database",
+        "*.helper.ts": "lib",
+        "main.ts": "nest",
+        "exception.ts": "certificate",
+        "*.exception.ts": "certificate",
+        "*.auth.strategy.ts": "nest-guard",
+        "*.interceptor.ts": "nest-middleware",
+        "*.contract.ts": "conduct",
+        "*.model.ts": "3d",
+        "index.ts": "url"
+    },
+    "material-icon-theme.folders.associations": {
+        "repository": "database",
+        "exception": "error",
+        "ci": "azure-pipelines",
+        "mongodb": "database",
+        "rabbitmq": "queue",
+        "voter": "routes",
+        "worker": "job",
+        "observability": "mappings",
+        "strategies": "guard",
+        "health": "base",
+        "bigquery": "database",
+        "task": "tasks",
+        "state": "pipe",
+        "workload": "config",
+        "source": "upload",
+        "target": "download",
+        "common": "utils",
+        "logging": "log",
+        "metrics": "shared",
+        "window": "tasks",
+        "transaction": "animation"
+    },
+    "cSpell.words": [
+        "acked",
+        "nacked",
+        "rabbitmq",
+        "rejecteds",
+        "unassert",
+        "unasserted",
+        "Unasserted",
+        "Unbindings"
     ]
 }

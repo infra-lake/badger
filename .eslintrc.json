@@ -1,0 +1,101 @@
+{
+    "root": true,
+    "env": {
+        "node": true,
+        "browser": true,
+        "es2021": true,
+        "jest": true
+    },
+    "plugins": [
+        "@typescript-eslint/eslint-plugin"
+    ],
+    "extends": "standard-with-typescript",
+    "parserOptions": {
+        "project": [
+            "./tsconfig.json"
+        ],
+        "ecmaVersion": "latest",
+        "sourceType": "module"
+    },
+    "rules": {
+        "indent": [
+            "error",
+            4,
+            {
+                "ignoredNodes": [
+                    "ConditionalExpression",
+                    "FunctionExpression > .params[decorators.length > 0]",
+                    "FunctionExpression > .params > :matches(Decorator, :not(:first-child))",
+                    "ClassBody.body > PropertyDefinition[decorators.length > 0] > .key"
+                ],
+                "VariableDeclarator": "first",
+                "SwitchCase": 1,
+                "ArrayExpression": 1,
+                "ObjectExpression": 1,
+                "flatTernaryExpressions": false,
+                "offsetTernaryExpressions": true,
+                "ignoreComments": true,
+                "MemberExpression": 1,
+                "FunctionDeclaration": {
+                    "parameters": "first"
+                },
+                "FunctionExpression": {
+                    "parameters": "first"
+                },
+                "CallExpression": {
+                    "arguments": "first"
+                }
+            }
+        ],
+        "new-cap": "off",
+        "multiline-ternary": "off",
+        "no-unexpected-multiline": "off",
+        "padded-blocks": "off",
+        "no-use-before-define": "off",
+        "no-useless-constructor": "off",
+        "space-before-function-paren": "off",
+        "array-element-newline": [
+            "error",
+            {
+                "multiline": true,
+                "minItems": 4
+            }
+        ],
+        "@typescript-eslint/indent": [
+            "error",
+            4,
+            {
+                "ignoredNodes": [
+                    "ConditionalExpression",
+                    "FunctionExpression > .params[decorators.length > 0]",
+                    "FunctionExpression > .params > :matches(Decorator, :not(:first-child))",
+                    "ClassBody.body > PropertyDefinition[decorators.length > 0] > .key"
+                ],
+                "VariableDeclarator": "first",
+                "SwitchCase": 1,
+                "ArrayExpression": 1,
+                "ObjectExpression": 1,
+                "flatTernaryExpressions": false,
+                "offsetTernaryExpressions": true,
+                "ignoreComments": true,
+                "MemberExpression": 1,
+                "FunctionDeclaration": {
+                    "parameters": "first"
+                },
+                "FunctionExpression": {
+                    "parameters": "first"
+                },
+                "CallExpression": {
+                    "arguments": "first"
+                }
+            }
+        ],
+        "@typescript-eslint/space-before-function-paren": "off",
+        "@typescript-eslint/func-call-spacing": "off",
+        "@typescript-eslint/interface-name-prefix": "off",
+        "@typescript-eslint/explicit-function-return-type": "off",
+        "@typescript-eslint/explicit-module-boundary-types": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-extraneous-class": "off"
+    }
+}

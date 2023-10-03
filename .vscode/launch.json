@@ -2,11 +2,44 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "node-terminal",
-            "name": "start",
-            "request": "launch",
-            "command": "npm run start",
-            "cwd": "${workspaceFolder}"
+            "type": "node",
+            "request": "attach",
+            "name": "Attach: manager",
+            "address": "0.0.0.0",
+            "port": 9229,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/opt/app",
+            "restart": true
+        },
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "Attach: voter",
+            "address": "0.0.0.0",
+            "port": 9230,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/opt/app",
+            "restart": true
+        },
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "Attach: worker1",
+            "address": "0.0.0.0",
+            "port": 9231,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/opt/app",
+            "restart": true
+        },
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "Attach: worker2",
+            "address": "0.0.0.0",
+            "port": 9232,
+            "localRoot": "${workspaceFolder}",
+            "remoteRoot": "/opt/app",
+            "restart": true
         }
     ]
 }

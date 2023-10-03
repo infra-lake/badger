@@ -2,13 +2,16 @@ services:
 
   # MongoDB ###########################################################
   mongodb:
-    image: mongo
+    image: bitnami/mongodb
     container_name: mongodb
     ports:
     - 27017:27017
     environment:
-      MONGO_INITDB_ROOT_USERNAME: mongodb
-      MONGO_INITDB_ROOT_PASSWORD: mongodb
+      MONGODB_ROOT_USER: mongodb
+      MONGODB_ROOT_PASSWORD: mongodb
+      MONGODB_ADVERTISED_HOSTNAME: mongodb
+      MONGODB_REPLICA_SET_KEY: replicaset
+      MONGODB_REPLICA_SET_MODE: primary
     restart: always
 
   mongo-express:
@@ -19,7 +22,149 @@ services:
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: mongodb
       ME_CONFIG_MONGODB_ADMINPASSWORD: mongodb
-      ME_CONFIG_MONGODB_URL: ${MONGODB_URL:-mongodb://mongodb:mongodb@mongodb:27017}
+      ME_CONFIG_MONGODB_URL: ${MONGODB_URL}
     restart: always
     depends_on:
     - mongodb
+
+  # Badger - Manager ##################################################
+  manager:
+    build:
+      context: ../
+      dockerfile: .docker/local.Dockerfile
+      args:
+        - NODE_VERSION=${NODE_VERSION}
+        - NPM_VERSION=${NPM_VERSION}
+    container_name: ${MANAGER_HOST}
+    command: start:debug manager
+    restart: always
+    volumes:
+      - "../:/opt/app"
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: ${MONGODB_DATABASE}
+      MONGODB_MIN_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE}
+      MONGODB_MAX_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE}
+      DEFAULT_STAMP_INSERT: ${DEFAULT_STAMP_INSERT}
+      DEFAULT_STAMP_UPDATE: ${DEFAULT_STAMP_UPDATE}
+      DEFAULT_STAMP_ID: ${DEFAULT_STAMP_ID}
+      DEFAULT_STAMP_DATASET_NAME_PREFIX: ${DEFAULT_STAMP_DATASET_NAME_PREFIX}
+      MANAGER_PORT: ${MANAGER_PORT}
+      VOTER: ${VOTER}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://${MANAGER_HOST}:${MANAGER_PORT}/health/readiness"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    ports:
+      - "${MANAGER_PORT}:${MANAGER_PORT}"
+      - "9229:9229"
+    depends_on:
+      - mongodb
+      - mongo-express
+      - voter
+      - worker1
+      - worker2
+
+  # Badger - Voter ####################################################
+  voter:
+    build:
+      context: ../
+      dockerfile: .docker/local.Dockerfile
+      args:
+        - NODE_VERSION=${NODE_VERSION}
+        - NPM_VERSION=${NPM_VERSION}
+    container_name: ${VOTER_HOST}
+    command: start:debug voter
+    restart: always
+    volumes:
+      - "../:/opt/app"
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: ${MONGODB_DATABASE}
+      MONGODB_MIN_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE}
+      MONGODB_MAX_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE}
+      DEFAULT_STAMP_INSERT: ${DEFAULT_STAMP_INSERT}
+      DEFAULT_STAMP_UPDATE: ${DEFAULT_STAMP_UPDATE}
+      DEFAULT_STAMP_ID: ${DEFAULT_STAMP_ID}
+      DEFAULT_STAMP_DATASET_NAME_PREFIX: ${DEFAULT_STAMP_DATASET_NAME_PREFIX}
+      VOTER_PORT: ${VOTER_PORT}
+      WORKERS: ${WORKERS}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://${VOTER_HOST}:${VOTER_PORT}/health/readiness"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    ports:
+      - "${VOTER_PORT}:${VOTER_PORT}"
+      - "9230:9229"
+    depends_on:
+      - mongodb
+      - mongo-express
+      - worker1
+      - worker2
+
+  # Badger - Worker 1 #################################################
+  worker1:
+    build:
+      context: ../
+      dockerfile: .docker/local.Dockerfile
+      args:
+        - NODE_VERSION=${NODE_VERSION}
+        - NPM_VERSION=${NPM_VERSION}
+    container_name: ${WORKER1_HOST}
+    command: start:debug worker
+    restart: always
+    volumes:
+      - "../:/opt/app"
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: ${MONGODB_DATABASE}
+      MONGODB_MIN_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE}
+      MONGODB_MAX_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE}
+      DEFAULT_STAMP_INSERT: ${DEFAULT_STAMP_INSERT}
+      DEFAULT_STAMP_UPDATE: ${DEFAULT_STAMP_UPDATE}
+      DEFAULT_STAMP_ID: ${DEFAULT_STAMP_ID}
+      DEFAULT_STAMP_DATASET_NAME_PREFIX: ${DEFAULT_STAMP_DATASET_NAME_PREFIX}
+      WORKER_PORT: ${WORKER1_PORT}
+      WORKER_NAME: ${WORKER1_NAME}
+    ports:
+      - "${WORKER1_PORT}:${WORKER1_PORT}"
+      - "9231:9229"
+    depends_on:
+      - mongodb
+      - mongo-express
+
+  # Badger - Worker 2 #################################################
+  worker2:
+    build:
+      context: ../
+      dockerfile: .docker/local.Dockerfile
+      args:
+        - NODE_VERSION=${NODE_VERSION}
+        - NPM_VERSION=${NPM_VERSION}
+    container_name: ${WORKER2_HOST}
+    command: start:debug worker
+    restart: always
+    volumes:
+      - "../:/opt/app"
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: ${MONGODB_DATABASE}
+      MONGODB_MIN_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE}
+      MONGODB_MAX_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE}
+      DEFAULT_STAMP_INSERT: ${DEFAULT_STAMP_INSERT}
+      DEFAULT_STAMP_UPDATE: ${DEFAULT_STAMP_UPDATE}
+      DEFAULT_STAMP_ID: ${DEFAULT_STAMP_ID}
+      DEFAULT_STAMP_DATASET_NAME_PREFIX: ${DEFAULT_STAMP_DATASET_NAME_PREFIX}
+      WORKER_PORT: ${WORKER2_PORT}
+      WORKER_NAME: ${WORKER2_NAME}
+    ports:
+      - "${WORKER2_PORT}:${WORKER2_PORT}"
+      - "9232:9229"
+    depends_on:
+      - mongodb
+      - mongo-express
+  
