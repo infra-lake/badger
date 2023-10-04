@@ -21,7 +21,9 @@ import {
     type Export4IsRunningInputDTO,
     type Export4ListInputhDTO,
     type Export4PauseInputDTO,
-    type Export4PlayInputDTO
+    type Export4PlayInputDTO,
+    type Export4RetryInputDTO,
+    type Export4GetErrorInputDTO
 } from '../export.dto'
 import { Export, ExportStatus } from '../export.entity'
 import { CreateExportStateService, PauseExportStateService, PlayExportStateService } from './state'
@@ -68,6 +70,20 @@ export class ExportService {
     }
 
     public async pause(context: TransactionalContext, key: Export4PauseInputDTO) {
+
+        if (ObjectHelper.isEmpty(context)) {
+            throw new InvalidParameterException('context', context)
+        }
+
+        await ClassValidatorHelper.validate('key', key)
+
+        await this.pauseService.apply(context, key)
+
+        return { transaction: TransactionHelper.getTransactionIDFrom(context) }
+
+    }
+
+    public async retry(context: TransactionalContext, key: Export4RetryInputDTO) {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
@@ -257,6 +273,20 @@ export class ExportService {
                 'target.name': input.target,
                 database: input.database,
                 status: ExportStatus.PAUSED
+            }
+        )
+    }
+
+    public async getError(input: Export4GetErrorInputDTO) {
+        await ClassValidatorHelper.validate('input', input)
+        return await MongoDBHelper.list<Export, 'transaction' | 'source' | 'target' | 'database', Model<Export>>(
+            this.model,
+            {
+                transaction: input.transaction,
+                'source.name': input.source,
+                'target.name': input.target,
+                database: input.database,
+                status: ExportStatus.ERROR
             }
         )
     }

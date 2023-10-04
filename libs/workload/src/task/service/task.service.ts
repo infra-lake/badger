@@ -3,15 +3,16 @@ import { ClassValidatorHelper, CollectionHelper, ObjectHelper, StringHelper } fr
 import { TransactionalLoggerService } from '@badger/common/logging'
 import { MongoDBHelper } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
-import { Inject, Injectable, forwardRef } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { BSONType, type TransactionOptions } from 'mongodb'
 import { Model, type ClientSession, type FilterQuery } from 'mongoose'
-import { ExportStatus } from '../../export'
+import { ExportDTO, ExportStatus } from '../../export'
 import { type IWorker } from '../../worker'
 import {
-    type Task4TerminateInputDTO,
+    type Task4ListInputDTO,
     type Task4CountCreatedOrRunningInputDTO,
+    type Task4CountErrorInputDTO,
     type Task4CountPausedInputDTO,
     type Task4GetCreatedOrRunningInputDTO,
     type Task4GetDateOfLastTerminatedInputDTO,
@@ -20,13 +21,17 @@ import {
     type Task4IsCreatedInputDTO,
     type Task4ListRunningInputDTO,
     type Task4RunKeyInputDTO,
+    type Task4TerminateInputDTO,
     type Task4TerminateKeyInputDTO,
     type Task4TerminateValueInputDTO,
     type TaskValue4ErrorKeyInputDTO,
-    type TaskValue4ErrorValueInputDTO
+    type TaskValue4ErrorValueInputDTO,
+    TaskDTO
 } from '../task.dto'
 import { Task } from '../task.entity'
 import { ErrorTaskStateService, RunTaskStateService, ScaleTaskStateService, TerminateTaskStateService } from './state'
+import { SourceDTO } from '@badger/source'
+import { TargetDTO } from '@badger/target'
 
 @Injectable()
 export class TaskService {
@@ -114,6 +119,83 @@ export class TaskService {
         }, options)
 
         this.logger.log(TaskService.name, context, 'all tasks are cleaned')
+
+    }
+
+    public async list(input: Task4ListInputDTO) {
+
+        try {
+            await ClassValidatorHelper.validate('input', input)
+        } catch (error) {
+            throw new BadRequestException(error)
+        }
+
+        const filter: FilterQuery<Partial<Task>> = {}
+
+        if (!StringHelper.isEmpty(input.transaction)) {
+            filter.transaction = input.transaction
+        }
+
+        if (!StringHelper.isEmpty(input.source)) {
+            filter['_export.source.name'] = input.source
+        }
+
+        if (!StringHelper.isEmpty(input.target)) {
+            filter['_export.target.name'] = input.target
+        }
+
+        if (!StringHelper.isEmpty(input.database)) {
+            filter['_export.target.database'] = input.database
+        }
+
+        if (!StringHelper.isEmpty(input._collection)) {
+            filter.status = input._collection
+        }
+
+        if (!StringHelper.isEmpty(input.status)) {
+            filter.status = input.status
+        }
+
+        if (!StringHelper.isEmpty(input.worker)) {
+            filter.status = input.worker
+        }
+
+        const result = await MongoDBHelper.list<Task, 'transaction' | '_export' | '_collection', Model<Task>>(this.model, filter)
+
+        const output = (result ?? []).map(({ transaction, _export, _collection, status, worker, error, count, window }) => {
+
+            const dto = new TaskDTO()
+            dto.transaction = transaction
+
+            dto._export = new ExportDTO()
+
+            dto._export.transaction = _export.transaction
+
+            dto._export.source = new SourceDTO()
+            dto._export.source.name = _export.source.name
+            dto._export.source.url = _export.source.url
+            dto._export.source.filter = _export.source.filter
+            dto._export.source.stamps = _export.source.stamps
+
+            dto._export.target = new TargetDTO()
+            dto._export.target.name = _export.target.name
+            dto._export.target.credentials = _export.target.credentials
+
+            dto._export.database = _export.database
+
+            dto._collection = _collection
+            dto.status = status
+
+            dto.worker = worker
+            dto.error = error
+            dto.count = count
+            dto.window = window
+
+            return dto
+
+        })
+
+        return output
 
     }
 
@@ -316,6 +398,30 @@ export class TaskService {
         }
 
         filter.status = ExportStatus.PAUSED
+
+        return await MongoDBHelper.count<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
+            this.model,
+            filter,
+            { session }
+        )
+
+    }
+
+    public async countError(input: Task4CountErrorInputDTO, session?: ClientSession) {
+
+        await ClassValidatorHelper.validate('input', input)
+
+        const filter: FilterQuery<Partial<Task>> = {
+            '_export.source.name': input.source,
+            '_export.target.name': input.target,
+            '_export.database': input.database
+        }
+
+        if (!StringHelper.isEmpty(input.transaction)) {
+            filter.transaction = input.transaction
+        }
+
+        filter.status = ExportStatus.ERROR
 
         return await MongoDBHelper.count<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
             this.model,

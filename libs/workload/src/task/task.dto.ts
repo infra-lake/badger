@@ -72,6 +72,39 @@ export class TaskValue4ErrorValueInputDTO {
     public error: any
 
 }
+
+export class Task4ListInputDTO {
+
+    @IsUUID()
+    @IsOptional()
+    public transaction?: string
+
+    @IsString()
+    @IsOptional()
+    public source?: string
+
+    @IsString()
+    @IsOptional()
+    public target?: string
+
+    @IsString()
+    @IsOptional()
+    public database?: string
+
+    @IsString()
+    @IsOptional()
+    public _collection: string
+
+    @IsString()
+    @IsOptional()
+    public status: ExportStatus
+
+    @IsString()
+    @IsOptional()
+    public worker?: string
+
+}
+
 export class Task4GetDateOfLastTerminatedInputDTO {
 
     @IsDefined()
@@ -189,6 +222,30 @@ export class Task4CountCreatedOrRunningInputDTO {
 }
 
 export class Task4CountPausedInputDTO {
+
+    @IsUUID()
+    @IsOptional()
+    public transaction?: string
+
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    public source: string
+
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    public target: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    public database: string
+
+}
+
+export class Task4CountErrorInputDTO {
 
     @IsUUID()
     @IsOptional()

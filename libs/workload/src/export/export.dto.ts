@@ -1,7 +1,7 @@
 import { SourceDTO } from '@badger/source'
 import { TargetDTO } from '@badger/target'
 import { ApiProperty, OmitType, PickType } from '@nestjs/swagger'
-import { IsDefined, IsEnum, IsNotEmpty, IsString, IsUUID, MinLength } from 'class-validator'
+import { IsDefined, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MinLength } from 'class-validator'
 import { ExportStatus } from './export.entity'
 
 export class ExportDTO {
@@ -124,7 +124,7 @@ export class Export4PauseInputDTO {
 
 }
 
-export class Export4ListInputhDTO {
+export class Export4RetryInputDTO {
 
     @IsUUID()
     @IsDefined()
@@ -153,11 +153,34 @@ export class Export4ListInputhDTO {
     @ApiProperty({ description: 'export source database name' })
     public database: string
 
+}
+
+export class Export4ListInputhDTO {
+
+    @IsUUID()
+    @IsOptional()
+    @ApiProperty({ description: 'transation uuid' })
+    public transaction?: string
+
+    @IsString()
+    @IsOptional()
+    @ApiProperty({ description: 'export source name' })
+    public source?: string
+
+    @IsString()
+    @IsOptional()
+    @ApiProperty({ description: 'export target name' })
+    public target?: string
+
+    @IsString()
+    @IsOptional()
+    @ApiProperty({ description: 'export source database name' })
+    public database?: string
+
     @IsEnum(ExportStatus)
-    @IsDefined()
-    @IsNotEmpty()
+    @IsOptional()
     @ApiProperty({ description: 'export status' })
-    public status: ExportStatus
+    public status?: ExportStatus
 
 }
 
@@ -223,6 +246,37 @@ export class Export4IsRunningInputDTO extends OmitType(ExportDTO, ['status'] as 
 export class Export4GetRunningInputDTO extends OmitType(ExportDTO, ['status'] as const) { }
 
 export class Export4GetPausedInputDTO {
+
+    @IsUUID()
+    @IsDefined()
+    @IsNotEmpty()
+    @ApiProperty({ description: 'transation uuid' })
+    public transaction: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export source name' })
+    public source: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export target name' })
+    public target: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export source database name' })
+    public database: string
+
+}
+
+export class Export4GetErrorInputDTO {
 
     @IsUUID()
     @IsDefined()
