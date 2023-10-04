@@ -5,19 +5,21 @@ import { MongoDBHelper } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { StateService } from '@badger/common/types'
 import { SourceService } from '@badger/source'
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { type TransactionOptions } from 'mongodb'
 import { Model } from 'mongoose'
-import { Task, Task4GetCreatedOrRunningInputDTO, TaskService, type TaskKey4CreateInputDTO } from '../..'
+import { Task4GetCreatedOrRunningInputDTO, type TaskKey4CreateInputDTO } from '../../task.dto'
 import { ExportStatus } from '@badger/workload/export'
+import { Task } from '../../task.entity'
+import { TaskService } from '../task.service'
 @Injectable()
 export class CreateTaskStateService extends StateService<TaskKey4CreateInputDTO, unknown> {
 
     public constructor(
         logger: TransactionalLoggerService,
         @InjectModel(Task.name) private readonly model: Model<Task>,
-        private readonly service: TaskService,
+        @Inject(forwardRef(() => TaskService)) private readonly service: TaskService,
         private readonly sourceService: SourceService
     ) { super(logger) }
 
@@ -97,8 +99,8 @@ export class CreateTaskStateService extends StateService<TaskKey4CreateInputDTO,
     private async getCreatedOrRunningFrom(key: TaskKey4CreateInputDTO) {
 
         const filter = new Task4GetCreatedOrRunningInputDTO()
-        filter.sourceName = key._export.source.name
-        filter.targetName = key._export.target.name
+        filter.source = key._export.source.name
+        filter.target = key._export.target.name
         filter.database = key._export.database
         filter._collection = key._collection as string
 

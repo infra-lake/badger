@@ -5,9 +5,9 @@ import { type TransactionalContext } from '@badger/common/transaction'
 import { type WindowDTO } from '@badger/common/window'
 import { Source4DownloadDocumentsDTO, SourceService } from '@badger/source'
 import { Target4UploadDocumentsDTO, TargetService } from '@badger/target'
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { type ClientSession } from 'mongoose'
-import { TaskKey4RunInputDTO, TaskService, type Task4RunOutputDTO } from '../task'
+import { Task4RunKeyInputDTO, TaskService, type Task4RunOutputDTO } from '../task'
 import { WorkerConfigService } from './worker.config.service'
 import { WorkerStatus, type IWorker } from './worker.contract'
 import { type Worker4SearchDTO } from './worker.dto'
@@ -20,7 +20,7 @@ export class WorkerService {
         private readonly config: WorkerConfigService,
         private readonly sourceService: SourceService,
         private readonly targetService: TargetService,
-        private readonly taskService: TaskService
+        @Inject(forwardRef(() => TaskService)) private readonly taskService: TaskService
     ) { }
 
     public async handle(context: TransactionalContext) {
@@ -38,13 +38,16 @@ export class WorkerService {
 
     private async getNextTask(context: TransactionalContext) {
 
-        const dto = new TaskKey4RunInputDTO()
+        const dto = new Task4RunKeyInputDTO()
         dto.worker = this.config.getCurrentWorkerName()
         dto.isToReturnCurrentRunningTask = !this.config.hasCurrentTaskId
 
         const result = await this.taskService.next(context, dto) as Task4RunOutputDTO
 
-        this.config.currentTaskId = `${result.transaction}/${result._export.source.name}/${result._export.target.name}/${result._export.database}/${result._collection}`
+        this.config.currentTaskId =
+            ObjectHelper.isEmpty(result)
+                ? undefined
+                : `${result.transaction}/${result._export.source.name}/${result._export.target.name}/${result._export.database}/${result._collection}`
 
         return result
     }

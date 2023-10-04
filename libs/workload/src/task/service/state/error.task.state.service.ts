@@ -4,16 +4,18 @@ import { TransactionalLoggerService } from '@badger/common/logging'
 import { MongoDBHelper } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { StateService } from '@badger/common/types'
+import { ExportStatus } from '@badger/workload/export'
+import { ErrorExportStateService } from '@badger/workload/export/service/state'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { type TransactionOptions } from 'mongodb'
 import { Model } from 'mongoose'
-import { Task, TaskService, type TaskKeyDTO, type TaskValue4ErrorInputDTO } from '../..'
-import { ErrorExportStateService } from '@badger/workload/export/service/state'
-import { ExportStatus } from '@badger/workload/export'
+import { type TaskValue4ErrorKeyInputDTO, type TaskValue4ErrorValueInputDTO } from '../../task.dto'
+import { Task } from '../../task.entity'
+import { TaskService } from '../task.service'
 
 @Injectable()
-export class ErrorTaskStateService extends StateService<TaskKeyDTO, TaskValue4ErrorInputDTO> {
+export class ErrorTaskStateService extends StateService<TaskValue4ErrorKeyInputDTO, TaskValue4ErrorValueInputDTO> {
 
     public constructor(
         logger: TransactionalLoggerService,
@@ -22,7 +24,7 @@ export class ErrorTaskStateService extends StateService<TaskKeyDTO, TaskValue4Er
         @Inject(forwardRef(() => ErrorExportStateService)) private readonly errorExportService: ErrorExportStateService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: TaskKeyDTO, value: TaskValue4ErrorInputDTO): Promise<void> {
+    public async apply(context: TransactionalContext, key: TaskValue4ErrorKeyInputDTO, value: TaskValue4ErrorValueInputDTO): Promise<void> {
 
         this.logger.debug?.(ErrorTaskStateService.name, context, 'registetring error on task', { _collection: key._collection, value })
 
@@ -54,7 +56,7 @@ export class ErrorTaskStateService extends StateService<TaskKeyDTO, TaskValue4Er
 
     }
 
-    protected async validate(context: TransactionalContext, key: TaskKeyDTO, value: TaskValue4ErrorInputDTO): Promise<void> {
+    protected async validate(context: TransactionalContext, key: TaskValue4ErrorKeyInputDTO, value: TaskValue4ErrorValueInputDTO): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
@@ -76,7 +78,7 @@ export class ErrorTaskStateService extends StateService<TaskKeyDTO, TaskValue4Er
 
     }
 
-    private async getRunningFrom(key: TaskKeyDTO, value: TaskValue4ErrorInputDTO) {
+    private async getRunningFrom(key: TaskValue4ErrorKeyInputDTO, value: TaskValue4ErrorValueInputDTO) {
 
         const { transaction, _export, _collection } = key
         const { worker } = value

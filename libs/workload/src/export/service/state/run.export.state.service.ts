@@ -7,13 +7,13 @@ import { StateService } from '@badger/common/types'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { type TransactionOptions } from 'mongodb'
-import { type ClientSession, Model } from 'mongoose'
-import { type ExportKeyDTO } from '../../export.dto'
+import { Model, type ClientSession } from 'mongoose'
+import { type Export4RunKeyInputDTO } from '../../export.dto'
 import { Export, ExportStatus } from '../../export.entity'
 import { ExportService } from '../export.service'
 
 @Injectable()
-export class RunExportStateService extends StateService<ExportKeyDTO, undefined> {
+export class RunExportStateService extends StateService<Export4RunKeyInputDTO, undefined> {
 
     public constructor(
         logger: TransactionalLoggerService,
@@ -21,7 +21,7 @@ export class RunExportStateService extends StateService<ExportKeyDTO, undefined>
         @Inject(forwardRef(() => ExportService)) private readonly service: ExportService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: ExportKeyDTO): Promise<void> {
+    public async apply(context: TransactionalContext, key: Export4RunKeyInputDTO): Promise<void> {
 
         this.logger.log(RunExportStateService.name, context, 'running export', {
             transaction: key.transaction,
@@ -54,7 +54,7 @@ export class RunExportStateService extends StateService<ExportKeyDTO, undefined>
 
     }
 
-    protected async validate(context: TransactionalContext, key: ExportKeyDTO, session?: ClientSession): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Export4RunKeyInputDTO, session?: ClientSession): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)

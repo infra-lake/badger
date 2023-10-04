@@ -5,24 +5,25 @@ import { MongoDBHelper } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
-import { BSONType } from 'mongodb'
+import { BSONType, type TransactionOptions } from 'mongodb'
 import { Model, type ClientSession, type FilterQuery } from 'mongoose'
 import { ExportStatus } from '../../export'
 import { type IWorker } from '../../worker'
 import {
+    type Task4TerminateInputDTO,
     type Task4CountCreatedOrRunningInputDTO,
     type Task4CountPausedInputDTO,
     type Task4GetCreatedOrRunningInputDTO,
+    type Task4GetDateOfLastTerminatedInputDTO,
     type Task4IsAllTerminateOrErrordInputDTO,
     type Task4IsAllTerminatedInputDTO,
-    type Task4IsOrGetRunningInputDTO,
-    type Task4IsScaledKeyInputDTO,
-    type Task4TerminateInputDTO,
-    type TaskKey4GetDateOfLastTerminatedInputDTO,
-    type TaskKey4RunInputDTO,
-    type TaskKeyDTO,
-    type TaskValue4ErrorInputDTO,
-    type TaskValue4TerminateInputDTO
+    type Task4IsCreatedInputDTO,
+    type Task4ListRunningInputDTO,
+    type Task4RunKeyInputDTO,
+    type Task4TerminateKeyInputDTO,
+    type Task4TerminateValueInputDTO,
+    type TaskValue4ErrorKeyInputDTO,
+    type TaskValue4ErrorValueInputDTO
 } from '../task.dto'
 import { Task } from '../task.entity'
 import { ErrorTaskStateService, RunTaskStateService, ScaleTaskStateService, TerminateTaskStateService } from './state'
@@ -39,54 +40,98 @@ export class TaskService {
         @Inject(forwardRef(() => ErrorTaskStateService)) private readonly errorService: ErrorTaskStateService
     ) { }
 
-    public async next(context: TransactionalContext, dto: TaskKey4RunInputDTO) {
-        const result = await this.runService.apply(context, dto)
-        return result
-    }
-
-    public async scale(context: TransactionalContext) {
-        await this.scaleService.apply(context)
-    }
-
-    public async terminate(context: TransactionalContext, dto: Task4TerminateInputDTO) {
+    public async next(context: TransactionalContext, key: Task4RunKeyInputDTO) {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
         }
 
-        await ClassValidatorHelper.validate('dto', dto)
+        await ClassValidatorHelper.validate('key', key)
 
-        const key: TaskKeyDTO = {
-            transaction: dto.transaction,
-            _export: dto._export,
-            _collection: dto._collection
+        const result = await this.runService.apply(context, key)
+
+        return result
+
+    }
+
+    public async scale(context: TransactionalContext) {
+
+        if (ObjectHelper.isEmpty(context)) {
+            throw new InvalidParameterException('context', context)
         }
 
-        const value: TaskValue4TerminateInputDTO = {
-            worker: dto.worker
+        await this.scaleService.apply(context)
+
+    }
+
+    public async terminate(context: TransactionalContext, input: Task4TerminateInputDTO) {
+
+        if (ObjectHelper.isEmpty(context)) {
+            throw new InvalidParameterException('context', context)
+        }
+
+        await ClassValidatorHelper.validate('input', input)
+
+        const key: Task4TerminateKeyInputDTO = {
+            transaction: input.transaction,
+            _export: input._export,
+            _collection: input._collection
+        }
+
+        const value: Task4TerminateValueInputDTO = {
+            worker: input.worker
         }
 
         await this.terminateService.apply(context, key, value)
 
     }
 
-    public async error(context: TransactionalContext, key: TaskKeyDTO, value: TaskValue4ErrorInputDTO) {
-        await this.errorService.apply(context, key, value)
-    }
+    public async error(context: TransactionalContext, key: TaskValue4ErrorKeyInputDTO, value: TaskValue4ErrorValueInputDTO) {
 
-    public async getDateOfLastTerminated(context: TransactionalContext, key: TaskKey4GetDateOfLastTerminatedInputDTO, session?: ClientSession) {
-
-        if (ObjectHelper.isEmpty(context)) { throw new InvalidParameterException('context', context) }
+        if (ObjectHelper.isEmpty(context)) {
+            throw new InvalidParameterException('context', context)
+        }
 
         await ClassValidatorHelper.validate('key', key)
+        await ClassValidatorHelper.validate('value', value)
+
+        await this.errorService.apply(context, key, value)
+
+    }
+
+    public async cleanup(context: TransactionalContext) {
+
+        if (ObjectHelper.isEmpty(context)) {
+            throw new InvalidParameterException('context', context)
+        }
+
+        this.logger.log(TaskService.name, context, 'cleaning tasks')
+
+        const options: TransactionOptions = { writeConcern: { w: 'majority' } }
+
+        await MongoDBHelper.withTransaction(this.model, async (session) => {
+            await this.model.deleteMany({}, { session })
+        }, options)
+
+        this.logger.log(TaskService.name, context, 'all tasks are cleaned')
+
+    }
+
+    public async getDateOfLastTerminated(context: TransactionalContext, input: Task4GetDateOfLastTerminatedInputDTO, session?: ClientSession) {
+
+        if (ObjectHelper.isEmpty(context)) {
+            throw new InvalidParameterException('context', context)
+        }
+
+        await ClassValidatorHelper.validate('input', input)
 
         const aggregation = await this.model.aggregate([
             {
                 $match: {
-                    '_export.source.name': key.sourceName,
-                    '_export.target.name': key.targetName,
-                    '_export.database': key.database,
-                    _collection: key._collection,
+                    '_export.source.name': input.source,
+                    '_export.target.name': input.target,
+                    '_export.database': input.database,
+                    _collection: input._collection,
                     status: ExportStatus.TERMINATED
                 }
             },
@@ -159,15 +204,15 @@ export class TaskService {
 
     }
 
-    public async isAllTerminated(dto: Task4IsAllTerminatedInputDTO) {
+    public async isAllTerminated(input: Task4IsAllTerminatedInputDTO) {
 
-        await ClassValidatorHelper.validate('dto', dto)
+        await ClassValidatorHelper.validate('input', input)
 
         const result = !await MongoDBHelper.exists(
             this.model,
             {
-                transaction: dto.transaction,
-                _export: dto._export,
+                transaction: input.transaction,
+                _export: input._export,
                 $or: [
                     { status: ExportStatus.CREATED },
                     { status: ExportStatus.RUNNING },
@@ -200,23 +245,23 @@ export class TaskService {
 
     }
 
-    public async listCreatedOrRunning(dto: Task4GetCreatedOrRunningInputDTO) {
+    public async listCreatedOrRunning(input: Task4GetCreatedOrRunningInputDTO) {
 
-        await ClassValidatorHelper.validate('dto', dto)
+        await ClassValidatorHelper.validate('input', input)
 
         const filter: FilterQuery<Partial<Task>> = {
-            '_export.source.name': dto.sourceName,
-            '_export.target.name': dto.targetName,
-            '_export.database': dto.database,
-            _collection: dto._collection
+            '_export.source.name': input.source,
+            '_export.target.name': input.target,
+            '_export.database': input.database,
+            _collection: input._collection
         }
 
-        if (!StringHelper.isEmpty(dto.transaction)) {
-            filter.transaction = dto.transaction
+        if (!StringHelper.isEmpty(input.transaction)) {
+            filter.transaction = input.transaction
         }
 
-        if (!StringHelper.isEmpty(dto.worker)) {
-            filter.worker = dto.worker
+        if (!StringHelper.isEmpty(input.worker)) {
+            filter.worker = input.worker
         }
 
         filter.$or = [{ status: ExportStatus.CREATED }, { status: ExportStatus.PAUSED }]
@@ -228,22 +273,22 @@ export class TaskService {
 
     }
 
-    public async countCreatedOrRunning(dto: Task4CountCreatedOrRunningInputDTO, session?: ClientSession) {
+    public async countCreatedOrRunning(input: Task4CountCreatedOrRunningInputDTO, session?: ClientSession) {
 
-        await ClassValidatorHelper.validate('dto', dto)
+        await ClassValidatorHelper.validate('input', input)
 
         const filter: FilterQuery<Partial<Task>> = {
-            '_export.source.name': dto.sourceName,
-            '_export.target.name': dto.targetName,
-            '_export.database': dto.database
+            '_export.source.name': input.source,
+            '_export.target.name': input.target,
+            '_export.database': input.database
         }
 
-        if (!StringHelper.isEmpty(dto.transaction)) {
-            filter.transaction = dto.transaction
+        if (!StringHelper.isEmpty(input.transaction)) {
+            filter.transaction = input.transaction
         }
 
-        if (!StringHelper.isEmpty(dto.worker)) {
-            filter.worker = dto.worker
+        if (!StringHelper.isEmpty(input.worker)) {
+            filter.worker = input.worker
         }
 
         filter.$or = [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }]
@@ -256,18 +301,18 @@ export class TaskService {
 
     }
 
-    public async countPaused(dto: Task4CountPausedInputDTO, session?: ClientSession) {
+    public async countPaused(input: Task4CountPausedInputDTO, session?: ClientSession) {
 
-        await ClassValidatorHelper.validate('dto', dto)
+        await ClassValidatorHelper.validate('input', input)
 
         const filter: FilterQuery<Partial<Task>> = {
-            '_export.source.name': dto.sourceName,
-            '_export.target.name': dto.targetName,
-            '_export.database': dto.database
+            '_export.source.name': input.source,
+            '_export.target.name': input.target,
+            '_export.database': input.database
         }
 
-        if (!StringHelper.isEmpty(dto.transaction)) {
-            filter.transaction = dto.transaction
+        if (!StringHelper.isEmpty(input.transaction)) {
+            filter.transaction = input.transaction
         }
 
         filter.status = ExportStatus.PAUSED
@@ -280,16 +325,16 @@ export class TaskService {
 
     }
 
-    public async isCreated(dto: TaskKeyDTO, session?: ClientSession) {
+    public async isCreated(input: Task4IsCreatedInputDTO, session?: ClientSession) {
 
-        await ClassValidatorHelper.validate('dto', dto)
+        await ClassValidatorHelper.validate('dto', input)
 
         return await MongoDBHelper.exists<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
             this.model,
             {
-                transaction: dto.transaction,
-                _export: dto._export,
-                _collection: dto._collection,
+                transaction: input.transaction,
+                _export: input._export,
+                _collection: input._collection,
                 status: ExportStatus.CREATED,
                 $or: [{ worker: { $exists: false } }, { worker: { $type: BSONType.null } }]
             },
@@ -298,38 +343,18 @@ export class TaskService {
 
     }
 
-    public async isScaled(dto: Task4IsScaledKeyInputDTO, session?: ClientSession) {
+    public async listRunning(input: Task4ListRunningInputDTO) {
 
-        await ClassValidatorHelper.validate('dto', dto)
-
-        return await MongoDBHelper.exists<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
-            this.model,
-            {
-                transaction: dto.transaction,
-                '_export.source.name': dto.sourceName,
-                '_export.target.name': dto.targetName,
-                '_export.database': dto.database,
-                _collection: dto._collection,
-                worker: dto.worker,
-                status: ExportStatus.CREATED
-            },
-            { session }
-        )
-
-    }
-
-    public async listRunning(dto: Task4IsOrGetRunningInputDTO) {
-
-        await ClassValidatorHelper.validate('dto', dto)
+        await ClassValidatorHelper.validate('input', input)
 
         const filter: FilterQuery<Partial<Task>> = {
-            transaction: dto.transaction,
-            _export: dto._export,
-            _collection: dto._collection
+            transaction: input.transaction,
+            _export: input._export,
+            _collection: input._collection
         }
 
-        if (!StringHelper.isEmpty(dto.worker)) {
-            filter.worker = dto.worker
+        if (!StringHelper.isEmpty(input.worker)) {
+            filter.worker = input.worker
         }
 
         filter.status = ExportStatus.RUNNING

@@ -375,7 +375,7 @@ export class MongoDBHelper {
 
     }
 
-    public async delete<T extends MongoDBDocument<T, K>, K extends keyof T>(
+    public static async delete<T extends MongoDBDocument<T, K>, K extends keyof T>(
         context: TransactionalContext,
         connection: Model<T>,
         key: FilterQuery<Required<Pick<T, K>>>

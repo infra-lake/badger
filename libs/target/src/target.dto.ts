@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType, PickType } from '@nestjs/swagger'
+import { ApiProperty, OmitType, PartialType, PickType } from '@nestjs/swagger'
 import { IsDefined, IsNotEmpty, IsString, IsUUID, MinLength } from 'class-validator'
 
 export class TargetDTO {
@@ -16,7 +16,7 @@ export class TargetDTO {
 
 }
 
-export class Target4SearchDTO extends PartialType(TargetDTO) { }
+export class Target4SearchDTO extends PartialType(OmitType(TargetDTO, ['credentials'] as const)) { }
 
 export class TargetKeyDTO extends PickType(TargetDTO, ['name'] as const) { }
 

@@ -1,7 +1,8 @@
 import { AuthConfigService } from '@badger/common/auth'
 import { ObjectHelper } from '@badger/common/helper'
+import { TransactionDTO } from '@badger/common/transaction'
 import { Target4SearchDTO, TargetDTO, TargetService, type Target } from '@badger/target'
-import { Body, Controller, Get, NotFoundException, Param, Post, Query, Req, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common'
+import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Query, Req, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { ApiBasicAuth, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { Request } from 'express'
@@ -22,6 +23,12 @@ export class TargetController {
     @ApiResponse({ type: Array<TargetDTO> })
     public async post(@Req() context: Request, @Body() dto: TargetDTO) {
         return await this.service.save(context, dto)
+    }
+
+    @Delete('/:name')
+    @ApiResponse({ type: TransactionDTO })
+    public async delete(@Req() context: Request, @Param('name') name: string) {
+        return await this.service.delete(context, { name })
     }
 
     @Get()

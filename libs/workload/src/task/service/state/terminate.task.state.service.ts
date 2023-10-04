@@ -4,16 +4,18 @@ import { TransactionalLoggerService } from '@badger/common/logging'
 import { MongoDBHelper } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { StateService } from '@badger/common/types'
+import { ErrorExportStateService, TerminateExportStateService } from '@badger/workload/export/service/state'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
+import { ExportStatus } from 'libs/workload/src/export'
 import { type TransactionOptions } from 'mongodb'
 import { Model } from 'mongoose'
-import { Task, TaskService, type TaskKeyDTO, type TaskValue4TerminateInputDTO } from '../..'
-import { ExportStatus } from 'libs/workload/src/export'
-import { ErrorExportStateService, TerminateExportStateService } from '@badger/workload/export/service/state'
+import { type Task4TerminateKeyInputDTO, type Task4TerminateValueInputDTO } from '../../task.dto'
+import { Task } from '../../task.entity'
+import { TaskService } from '../task.service'
 
 @Injectable()
-export class TerminateTaskStateService extends StateService<TaskKeyDTO, TaskValue4TerminateInputDTO> {
+export class TerminateTaskStateService extends StateService<Task4TerminateKeyInputDTO, Task4TerminateValueInputDTO> {
 
     public constructor(
         logger: TransactionalLoggerService,
@@ -23,7 +25,7 @@ export class TerminateTaskStateService extends StateService<TaskKeyDTO, TaskValu
         @Inject(forwardRef(() => ErrorExportStateService)) private readonly errorExportService: ErrorExportStateService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: TaskKeyDTO, value: TaskValue4TerminateInputDTO): Promise<void> {
+    public async apply(context: TransactionalContext, key: Task4TerminateKeyInputDTO, value: Task4TerminateValueInputDTO): Promise<void> {
 
         this.logger.debug?.(TerminateTaskStateService.name, context, 'terminating task', {
             transaction: key.transaction,
@@ -66,7 +68,7 @@ export class TerminateTaskStateService extends StateService<TaskKeyDTO, TaskValu
 
     }
 
-    protected async validate(context: TransactionalContext, key: TaskKeyDTO, value: TaskValue4TerminateInputDTO): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Task4TerminateKeyInputDTO, value: Task4TerminateValueInputDTO): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
@@ -88,7 +90,7 @@ export class TerminateTaskStateService extends StateService<TaskKeyDTO, TaskValu
 
     }
 
-    private async getRunningFrom(key: TaskKeyDTO, value: TaskValue4TerminateInputDTO) {
+    private async getRunningFrom(key: Task4TerminateKeyInputDTO, value: Task4TerminateValueInputDTO) {
 
         const { transaction, _export, _collection } = key
         const { worker } = value

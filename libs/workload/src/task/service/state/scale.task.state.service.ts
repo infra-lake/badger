@@ -10,10 +10,12 @@ import { InjectModel } from '@nestjs/mongoose'
 import { ExportStatus } from 'libs/workload/src/export'
 import { BSONType, type TransactionOptions } from 'mongodb'
 import { Model, type ClientSession } from 'mongoose'
-import { Task, TaskService, type TaskKeyDTO, type TaskValue4ScaleInputDTO } from '../..'
+import { type Task4IsCreatedInputDTO, type Task4ScaleKeyInputDTO, type Task4ScaleValueInputDTO } from '../../task.dto'
+import { Task } from '../../task.entity'
+import { TaskService } from '../task.service'
 
 @Injectable()
-export class ScaleTaskStateService extends StateService<TaskKeyDTO | undefined, TaskValue4ScaleInputDTO | undefined> {
+export class ScaleTaskStateService extends StateService<Task4ScaleKeyInputDTO | undefined, Task4ScaleValueInputDTO | undefined> {
 
     public constructor(
         logger: TransactionalLoggerService,
@@ -85,16 +87,16 @@ export class ScaleTaskStateService extends StateService<TaskKeyDTO | undefined, 
 
     }
 
-    private async getDateOfLastTerminated(context: TransactionalContext, key: TaskKeyDTO, session: ClientSession) {
+    private async getDateOfLastTerminated(context: TransactionalContext, key: Task4ScaleKeyInputDTO, session: ClientSession) {
         return await this.service.getDateOfLastTerminated(context, {
-            sourceName: key._export.source.name,
-            targetName: key._export.target.name,
+            source: key._export.source.name,
+            target: key._export.target.name,
             database: key._export.database,
             _collection: key._collection
         }, session)
     }
 
-    protected async validate(context: TransactionalContext, key?: TaskKeyDTO, value?: TaskValue4ScaleInputDTO, session?: ClientSession): Promise<void> {
+    protected async validate(context: TransactionalContext, key?: Task4ScaleKeyInputDTO, value?: Task4ScaleValueInputDTO, session?: ClientSession): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
@@ -104,8 +106,8 @@ export class ScaleTaskStateService extends StateService<TaskKeyDTO | undefined, 
 
         try {
 
-            await ClassValidatorHelper.validate('key', key as any as TaskKeyDTO)
-            await ClassValidatorHelper.validate('value', value as TaskValue4ScaleInputDTO)
+            await ClassValidatorHelper.validate('key', key as any)
+            await ClassValidatorHelper.validate('value', value as any)
             if (ObjectHelper.isEmpty(session)) {
                 throw new InvalidParameterException('session', session)
             }
@@ -114,7 +116,7 @@ export class ScaleTaskStateService extends StateService<TaskKeyDTO | undefined, 
                 throw new InvalidParameterException('key', key, 'task does not exists')
             }
 
-            if (!await this.service.isCreated(key as any as TaskKeyDTO, session)) {
+            if (!await this.service.isCreated(key as any as Task4IsCreatedInputDTO, session)) {
                 throw new InvalidParameterException('key', key, 'task is not created')
             }
 

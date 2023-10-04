@@ -1,29 +1,29 @@
 import { InvalidParameterException, InvalidStateChangeException } from '@badger/common/exception'
+import { ClassValidatorHelper, CollectionHelper, ObjectHelper } from '@badger/common/helper'
 import { TransactionalLoggerService } from '@badger/common/logging'
 import { MongoDBHelper } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { StateService } from '@badger/common/types'
+import { PlayTaskStateService } from '@badger/workload/task/service/state'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { type TransactionOptions } from 'mongodb'
 import { Model } from 'mongoose'
-import { type ExportKeyDTO } from '../../export.dto'
+import { type Export4PlayInputDTO } from '../../export.dto'
 import { Export, ExportStatus } from '../../export.entity'
 import { ExportService } from '../export.service'
-import { ClassValidatorHelper, CollectionHelper, ObjectHelper } from '@badger/common/helper'
-import { PlayTaskStateService } from '@badger/workload/task/service/state'
 
 @Injectable()
-export class PlayExportStateService extends StateService<ExportKeyDTO, undefined> {
+export class PlayExportStateService extends StateService<Export4PlayInputDTO, undefined> {
 
     public constructor(
         logger: TransactionalLoggerService,
         @InjectModel(Export.name) private readonly model: Model<Export>,
         @Inject(forwardRef(() => ExportService)) private readonly service: ExportService,
-        private readonly playTaskService: PlayTaskStateService
+        @Inject(forwardRef(() => PlayTaskStateService)) private readonly playTaskService: PlayTaskStateService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: ExportKeyDTO): Promise<void> {
+    public async apply(context: TransactionalContext, key: Export4PlayInputDTO): Promise<void> {
 
         this.logger.log(PlayExportStateService.name, context, 'playing export', { key })
 
@@ -36,8 +36,8 @@ export class PlayExportStateService extends StateService<ExportKeyDTO, undefined
             await this.model.findOneAndUpdate(
                 {
                     transaction: key.transaction,
-                    source: key.source,
-                    target: key.target,
+                    'source.name': key.source,
+                    'target.name': key.target,
                     database: key.database,
                     status: ExportStatus.PAUSED
                 },
@@ -51,14 +51,14 @@ export class PlayExportStateService extends StateService<ExportKeyDTO, undefined
 
         this.logger.log(PlayExportStateService.name, context, 'export was played successfully', {
             transaction: key.transaction,
-            source: key.source.name,
-            target: key.target.name,
+            source: key.source,
+            target: key.target,
             database: key.database
         })
 
     }
 
-    protected async validate(context: TransactionalContext, key: ExportKeyDTO): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Export4PlayInputDTO): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)

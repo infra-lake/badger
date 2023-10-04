@@ -46,7 +46,7 @@ export class WorkerConfigService {
     }
 
     private _currenTaskId?: string = undefined
-    public set currentTaskId(currenTaskId: string) { this._currenTaskId = currenTaskId }
+    public set currentTaskId(currenTaskId: string | undefined) { this._currenTaskId = currenTaskId }
     public get currentTaskId(): string | undefined { return this._currenTaskId }
     public get hasCurrentTaskId(): boolean { return !StringHelper.isEmpty(this.currentTaskId) }
 

@@ -48,6 +48,22 @@ export class TargetService {
 
     }
 
+    public async delete(context: TransactionalContext, dto: TargetKeyDTO) {
+
+        if (ObjectHelper.isEmpty(context)) { throw new InvalidParameterException('context', context) }
+
+        try {
+            await ClassValidatorHelper.validate('dto', dto)
+        } catch (error) {
+            throw new BadRequestException(error)
+        }
+
+        await MongoDBHelper.delete<Target, 'name'>(context, this.model, dto)
+
+        return { transaction: TransactionHelper.getTransactionIDFrom(context) }
+
+    }
+
     public async get(key: TargetKeyDTO) {
         return await MongoDBHelper.get<Target, 'name', Model<Target>>(this.model, key)
     }

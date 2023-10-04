@@ -8,12 +8,12 @@ import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { type TransactionOptions } from 'mongodb'
 import { Model } from 'mongoose'
-import { type ExportKeyDTO } from '../../export.dto'
+import { type Export4TerminateKeyInputDTO } from '../../export.dto'
 import { Export, ExportStatus } from '../../export.entity'
 import { ExportService } from '../export.service'
 
 @Injectable()
-export class TerminateExportStateService extends StateService<ExportKeyDTO, undefined> {
+export class TerminateExportStateService extends StateService<Export4TerminateKeyInputDTO, undefined> {
 
     public constructor(
         logger: TransactionalLoggerService,
@@ -21,7 +21,7 @@ export class TerminateExportStateService extends StateService<ExportKeyDTO, unde
         @Inject(forwardRef(() => ExportService)) private readonly service: ExportService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: ExportKeyDTO): Promise<void> {
+    public async apply(context: TransactionalContext, key: Export4TerminateKeyInputDTO): Promise<void> {
 
         this.logger.log(TerminateExportStateService.name, context, 'terminating export', { key })
 
@@ -54,7 +54,7 @@ export class TerminateExportStateService extends StateService<ExportKeyDTO, unde
 
     }
 
-    protected async validate(context: TransactionalContext, key: ExportKeyDTO): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Export4TerminateKeyInputDTO): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)

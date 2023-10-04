@@ -9,6 +9,7 @@ export class FilterSourceDTO implements ICollectionsFilter {
 
     @IsArray()
     @IsOptional()
+    @ApiProperty({ description: 'list of collection names to be ignored' })
     ignoredCollections?: string[]
 
 }
@@ -42,6 +43,7 @@ export class SourceDTO {
 
     @IsObject()
     @IsDefined()
+    @ApiProperty({ description: 'stamps to be used on export' })
     public stamps: StampsDTO
 
 }
@@ -49,10 +51,11 @@ export class SourceDTO {
 export class SourceDTO4SaveDTO extends OmitType(SourceDTO, ['stamps'] as const) {
     @IsObject()
     @IsOptional()
+    @ApiProperty({ description: 'stamps to be used on export' })
     public stamps?: PartialStampsDTO
 }
 
-export class Source4SearchDTO extends PartialType(SourceDTO) { }
+export class Source4SearchDTO extends PartialType(OmitType(SourceDTO, ['url', 'filter', 'stamps'] as const)) { }
 
 export class SourceKeyDTO extends PickType(SourceDTO, ['name'] as const) { }
 

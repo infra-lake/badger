@@ -7,13 +7,13 @@ import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { type TransactionOptions } from 'mongodb'
 import { Model } from 'mongoose'
-import { type ExportKeyDTO } from '../../export.dto'
+import { type Export4ErrorKeyInputDTO } from '../../export.dto'
 import { Export, ExportStatus } from '../../export.entity'
 import { ExportService } from '../export.service'
 import { ClassValidatorHelper, CollectionHelper, ObjectHelper } from '@badger/common/helper'
 
 @Injectable()
-export class ErrorExportStateService extends StateService<ExportKeyDTO, undefined> {
+export class ErrorExportStateService extends StateService<Export4ErrorKeyInputDTO, undefined> {
 
     public constructor(
         logger: TransactionalLoggerService,
@@ -21,7 +21,7 @@ export class ErrorExportStateService extends StateService<ExportKeyDTO, undefine
         @Inject(forwardRef(() => ExportService)) private readonly service: ExportService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: ExportKeyDTO): Promise<void> {
+    public async apply(context: TransactionalContext, key: Export4ErrorKeyInputDTO): Promise<void> {
 
         this.logger.log(ErrorExportStateService.name, context, 'registering error on export', { key })
 
@@ -54,7 +54,7 @@ export class ErrorExportStateService extends StateService<ExportKeyDTO, undefine
 
     }
 
-    protected async validate(context: TransactionalContext, key: ExportKeyDTO): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Export4ErrorKeyInputDTO): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)

@@ -57,6 +57,22 @@ export class SourceService {
 
     }
 
+    public async delete(context: TransactionalContext, dto: SourceKeyDTO) {
+
+        if (ObjectHelper.isEmpty(context)) { throw new InvalidParameterException('context', context) }
+
+        try {
+            await ClassValidatorHelper.validate('dto', dto)
+        } catch (error) {
+            throw new BadRequestException(error)
+        }
+
+        await MongoDBHelper.delete<Source, 'name'>(context, this.model, dto)
+
+        return { transaction: TransactionHelper.getTransactionIDFrom(context) }
+
+    }
+
     public async get(key: SourceKeyDTO) {
         return await MongoDBHelper.get<Source, 'name', Model<Source>>(this.model, key)
     }

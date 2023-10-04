@@ -11,10 +11,12 @@ import { InjectModel } from '@nestjs/mongoose'
 import { ExportStatus } from 'libs/workload/src/export'
 import { type TransactionOptions } from 'mongodb'
 import { Model, type ClientSession } from 'mongoose'
-import { Task, TaskService, type TaskKeyDTO, type TaskKey4RunInputDTO, Task4IsScaledKeyInputDTO, type Task4RunOutputDTO } from '../..'
+import { type Task4RunKeyInputDTO, type Task4RunOutputDTO } from '../../task.dto'
+import { Task } from '../../task.entity'
+import { TaskService } from '../task.service'
 
 @Injectable()
-export class RunTaskStateService extends StateService<TaskKey4RunInputDTO, undefined, Task4RunOutputDTO | undefined> {
+export class RunTaskStateService extends StateService<Task4RunKeyInputDTO, undefined, Task4RunOutputDTO | undefined> {
 
     public constructor(
         logger: TransactionalLoggerService,
@@ -24,7 +26,7 @@ export class RunTaskStateService extends StateService<TaskKey4RunInputDTO, undef
         private readonly workerService: WorkerService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: TaskKey4RunInputDTO) {
+    public async apply(context: TransactionalContext, key: Task4RunKeyInputDTO) {
 
         const options: TransactionOptions = { writeConcern: { w: 'majority' } }
 
@@ -59,7 +61,7 @@ export class RunTaskStateService extends StateService<TaskKey4RunInputDTO, undef
 
     }
 
-    private async getNextTask(context: TransactionalContext, key: TaskKey4RunInputDTO, session: ClientSession) {
+    private async getNextTask(context: TransactionalContext, key: Task4RunKeyInputDTO, session: ClientSession) {
 
         let result = await this.model.findOne(
             { status: ExportStatus.CREATED, worker: key.worker },
@@ -96,7 +98,7 @@ export class RunTaskStateService extends StateService<TaskKey4RunInputDTO, undef
 
     }
 
-    protected async validate(context: TransactionalContext, key: TaskKey4RunInputDTO, session?: ClientSession): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Task4RunKeyInputDTO, session?: ClientSession): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
@@ -113,20 +115,6 @@ export class RunTaskStateService extends StateService<TaskKey4RunInputDTO, undef
         } catch (error) {
             throw new InvalidStateChangeException(error)
         }
-
-    }
-
-    private async isScaled(key: TaskKeyDTO, value: TaskKey4RunInputDTO, session?: ClientSession) {
-
-        const dto = new Task4IsScaledKeyInputDTO()
-        dto.transaction = key.transaction
-        dto.sourceName = key._export.source.name
-        dto.targetName = key._export.target.name
-        dto.database = key._export.database
-        dto._collection = key._collection
-        dto.worker = value.worker
-
-        return await this.service.isScaled(dto, session)
 
     }
 
