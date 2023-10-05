@@ -1,6 +1,5 @@
 import { InvalidParameterException } from '@badger/common/exception'
 import { CollectionHelper, ObjectHelper, ResilienceHelper } from '@badger/common/helper'
-import { TransactionalLoggerService } from '@badger/common/logging'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { type WindowDTO } from '@badger/common/window'
 import { Source4DownloadDocumentsDTO, SourceService } from '@badger/source'
@@ -16,7 +15,6 @@ import { type Worker4SearchDTO } from './worker.dto'
 export class WorkerService {
 
     constructor(
-        private readonly logger: TransactionalLoggerService,
         private readonly config: WorkerConfigService,
         private readonly sourceService: SourceService,
         private readonly targetService: TargetService,
@@ -25,30 +23,34 @@ export class WorkerService {
 
     public async handle(context: TransactionalContext) {
 
+        if (this.config.working) { return }
+
         const task = await this.getNextTask(context)
+
         if (ObjectHelper.isEmpty(task)) { return }
 
         try {
+
+            this.config.working = true
+
             await ResilienceHelper.tryToRun(context, 5, this.perform.bind(this), task, new Date())
+
         } catch (error) {
+
             await this.taskService.error(context, task, { error, worker: this.config.getCurrentWorkerName() })
+
+        } finally {
+
+            this.config.working = false
+
         }
 
     }
 
     private async getNextTask(context: TransactionalContext) {
-
         const dto = new Task4RunKeyInputDTO()
         dto.worker = this.config.getCurrentWorkerName()
-        dto.isToReturnCurrentRunningTask = !this.config.hasCurrentTaskId
-
         const result = await this.taskService.next(context, dto) as Task4RunOutputDTO
-
-        this.config.currentTaskId =
-            ObjectHelper.isEmpty(result)
-                ? undefined
-                : `${result.transaction}/${result._export.source.name}/${result._export.target.name}/${result._export.database}/${result._collection}`
-
         return result
     }
 

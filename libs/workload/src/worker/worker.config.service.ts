@@ -1,4 +1,4 @@
-import { CollectionHelper, StringHelper } from '@badger/common/helper'
+import { CollectionHelper } from '@badger/common/helper'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { WorkerHelper, type WorkerDTO } from '@badger/workload'
 import { HttpService } from '@nestjs/axios'
@@ -45,9 +45,8 @@ export class WorkerConfigService {
             : fileName
     }
 
-    private _currenTaskId?: string = undefined
-    public set currentTaskId(currenTaskId: string | undefined) { this._currenTaskId = currenTaskId }
-    public get currentTaskId(): string | undefined { return this._currenTaskId }
-    public get hasCurrentTaskId(): boolean { return !StringHelper.isEmpty(this.currentTaskId) }
+    private _working: boolean = false
+    public set working(value: boolean) { this._working = value }
+    public get working(): boolean { return this._working }
 
 }

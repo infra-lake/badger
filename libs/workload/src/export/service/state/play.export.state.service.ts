@@ -68,7 +68,7 @@ export class PlayExportStateService extends StateService<Export4PlayInputDTO, un
 
             await ClassValidatorHelper.validate('key', key)
 
-            const found = await this.service.getPaused(key)
+            const found = await this.service.listPaused(key)
             if (!CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'could not play the export because it is not paused')
             }

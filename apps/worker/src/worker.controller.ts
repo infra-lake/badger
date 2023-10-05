@@ -7,7 +7,7 @@ import { WorkerService } from '@badger/workload'
 export class WorkerController {
     constructor(private readonly workerService: WorkerService) { }
 
-    @Cron(CronExpression.EVERY_MINUTE)
+    @Cron(CronExpression.EVERY_10_SECONDS)
     public async handle() {
         const context = TransactionHelper.newTransactionalContext()
         await this.workerService.handle(context)

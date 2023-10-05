@@ -1,7 +1,7 @@
 import { AuthConfigService } from '@badger/common/auth'
 import { ObjectHelper } from '@badger/common/helper'
 import { TransactionDTO } from '@badger/common/transaction'
-import { Export4CheckInputDTO, Export4CheckOutputDTO, Export4CreateKeyInputDTO, Export4ListInputhDTO, Export4PauseInputDTO, Export4PlayInputDTO, ExportService, type ExportDTO, Export4RetryInputDTO, type TaskDTO, TaskService, Task4ListInputDTO } from '@badger/workload'
+import { Export4CheckInputDTO, Export4CheckOutputDTO, Export4CreateKeyInputDTO, Export4ListInputDTO, Export4PauseInputDTO, Export4PlayInputDTO, Export4RetryInputDTO, ExportService, Task4ListInputDTO, TaskService, type ExportDTO, type TaskDTO } from '@badger/workload'
 import { Body, Controller, Get, Inject, NotFoundException, Post, Query, Req, UseGuards, UsePipes, ValidationPipe, forwardRef } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { ApiBasicAuth, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
@@ -18,7 +18,7 @@ export class ExportController {
         @Inject(forwardRef(() => TaskService)) private readonly taskService: TaskService
     ) { }
 
-    @Post()
+    @Post('/create')
     @UsePipes(ValidationPipe)
     @ApiBody({ type: Export4CreateKeyInputDTO, required: true })
     @ApiResponse({ type: TransactionDTO })
@@ -26,7 +26,7 @@ export class ExportController {
         return await this.exportService.create(context, input)
     }
 
-    @Get('/cleanup')
+    @Post('/cleanup')
     @ApiResponse({ type: TransactionDTO })
     public async cleanup(@Req() context: Request) {
         return await this.exportService.cleanup(context)
@@ -52,8 +52,8 @@ export class ExportController {
 
     @Get()
     @ApiResponse({ type: Array<ExportDTO> })
-    public async exports(@Query() input: Export4ListInputhDTO) {
-        const output = await this.exportService.list(input)
+    public async exports(@Query() input: Export4ListInputDTO) {
+        const output = await this.exportService.list(input, 'dto')
         return output
     }
 

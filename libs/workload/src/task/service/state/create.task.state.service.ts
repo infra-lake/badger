@@ -9,7 +9,7 @@ import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { type TransactionOptions } from 'mongodb'
 import { Model } from 'mongoose'
-import { Task4GetCreatedOrRunningInputDTO, type TaskKey4CreateInputDTO } from '../../task.dto'
+import { Task4GetCreatedRunningOrPausedInputDTO, type TaskKey4CreateInputDTO } from '../../task.dto'
 import { ExportStatus } from '@badger/workload/export'
 import { Task } from '../../task.entity'
 import { TaskService } from '../task.service'
@@ -98,13 +98,13 @@ export class CreateTaskStateService extends StateService<TaskKey4CreateInputDTO,
 
     private async getCreatedOrRunningFrom(key: TaskKey4CreateInputDTO) {
 
-        const filter = new Task4GetCreatedOrRunningInputDTO()
+        const filter = new Task4GetCreatedRunningOrPausedInputDTO()
         filter.source = key._export.source.name
         filter.target = key._export.target.name
         filter.database = key._export.database
         filter._collection = key._collection as string
 
-        return await this.service.listCreatedOrRunning(filter)
+        return await this.service.listCreatedRunningOrPaused(filter)
 
     }
 

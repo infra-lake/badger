@@ -23,7 +23,12 @@ export class TerminateExportStateService extends StateService<Export4TerminateKe
 
     public async apply(context: TransactionalContext, key: Export4TerminateKeyInputDTO): Promise<void> {
 
-        this.logger.log(TerminateExportStateService.name, context, 'terminating export', { key })
+        this.logger.log(TerminateExportStateService.name, context, 'terminating export', {
+            transaction: key.transaction,
+            source: key.source.name,
+            target: key.target.name,
+            database: key.database
+        })
 
         const options: TransactionOptions = { writeConcern: { w: 'majority' } }
 
@@ -65,7 +70,7 @@ export class TerminateExportStateService extends StateService<Export4TerminateKe
             await ClassValidatorHelper.validate('key', key)
 
             const found = await this.service.getRunning(key)
-            if (!CollectionHelper.isEmpty(found)) {
+            if (CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'does not possible terminate export because export is not running state')
             }
 

@@ -68,8 +68,8 @@ export class RetryExportStateService extends StateService<Export4RetryInputDTO, 
 
             await ClassValidatorHelper.validate('key', key)
 
-            const found = await this.service.getError(key)
-            if (!CollectionHelper.isEmpty(found)) {
+            const found = await this.service.listError(key)
+            if (CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'could not retry the export because it is not terminated with error')
             }
 

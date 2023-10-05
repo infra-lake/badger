@@ -1,3 +1,4 @@
+import { InvalidParameterException } from '@badger/common/exception'
 import { ClassValidatorHelper, ObjectHelper, StringHelper } from '@badger/common/helper'
 import { TransactionalLoggerService } from '@badger/common/logging'
 import { MongoDBHelper } from '@badger/common/mongodb'
@@ -14,20 +15,21 @@ import {
     ExportDTO,
     type Export4CheckInputDTO,
     type Export4CreateKeyInputDTO,
-    type Export4GetCreatedOrRunningInputDTO,
-    type Export4GetPausedInputDTO,
+    type Export4GetInputDTO,
     type Export4GetRunningInputDTO,
     type Export4IsCreatedInputDTO,
     type Export4IsRunningInputDTO,
-    type Export4ListInputhDTO,
+    type Export4ListCreatedOrRunningInputDTO,
+    type Export4ListCreatedRunningOrPausedInputDTO,
+    type Export4ListErrorInputDTO,
+    type Export4ListInputDTO,
+    type Export4ListPausedInputDTO,
     type Export4PauseInputDTO,
     type Export4PlayInputDTO,
-    type Export4RetryInputDTO,
-    type Export4GetErrorInputDTO
+    type Export4RetryInputDTO
 } from '../export.dto'
 import { Export, ExportStatus } from '../export.entity'
-import { CreateExportStateService, PauseExportStateService, PlayExportStateService } from './state'
-import { InvalidParameterException } from '@badger/common/exception'
+import { CreateExportStateService, PauseExportStateService, PlayExportStateService, RetryExportStateService } from './state'
 
 @Injectable()
 export class ExportService {
@@ -38,6 +40,7 @@ export class ExportService {
         @Inject(forwardRef(() => CreateExportStateService)) private readonly createService: CreateExportStateService,
         @Inject(forwardRef(() => PauseExportStateService)) private readonly pauseService: PauseExportStateService,
         @Inject(forwardRef(() => PlayExportStateService)) private readonly playService: PlayExportStateService,
+        @Inject(forwardRef(() => RetryExportStateService)) private readonly retryService: RetryExportStateService,
         private readonly taskService: TaskService
     ) { }
 
@@ -91,7 +94,7 @@ export class ExportService {
 
         await ClassValidatorHelper.validate('key', key)
 
-        await this.pauseService.apply(context, key)
+        await this.retryService.apply(context, key)
 
         return { transaction: TransactionHelper.getTransactionIDFrom(context) }
 
@@ -121,7 +124,26 @@ export class ExportService {
 
     }
 
-    public async list(input: Export4ListInputhDTO) {
+    public async get(input: Export4GetInputDTO) {
+
+        try {
+            await ClassValidatorHelper.validate('input', input)
+        } catch (error) {
+            throw new BadRequestException(error)
+        }
+
+        const result = await MongoDBHelper.get<Export, 'transaction' | 'source' | 'target' | 'database', Model<Export>>(this.model, {
+            transaction: input.transaction,
+            'source.name': input.source,
+            'target.name': input.target,
+            database: input.database
+        })
+
+        return result as Export
+
+    }
+
+    public async list<T extends 'dto' | 'raw'>(input: Export4ListInputDTO, returns: T): Promise<T extends 'dto' ? ExportDTO[] : Export[]> {
 
         try {
             await ClassValidatorHelper.validate('input', input)
@@ -153,6 +175,10 @@ export class ExportService {
 
         const result = await MongoDBHelper.list<Export, 'transaction' | 'source' | 'target' | 'database', Model<Export>>(this.model, filter)
 
+        if (returns === 'raw') {
+            return result
+        }
+
         const output = (result ?? []).map(({ transaction, source, target, database, status }) => {
 
             const dto = new ExportDTO()
@@ -176,7 +202,7 @@ export class ExportService {
 
         })
 
-        return output
+        return output as any
 
     }
 
@@ -221,7 +247,20 @@ export class ExportService {
         )
     }
 
-    public async getCreatedOrRunning(input: Export4GetCreatedOrRunningInputDTO) {
+    public async listCreatedRunningOrPaused(input: Export4ListCreatedRunningOrPausedInputDTO) {
+        await ClassValidatorHelper.validate('input', input)
+        return await MongoDBHelper.list<Export, 'transaction' | 'source' | 'target' | 'database', Model<Export>>(
+            this.model,
+            {
+                'source.name': input.source,
+                'target.name': input.target,
+                database: input.database,
+                $or: [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }, { status: ExportStatus.PAUSED }]
+            }
+        )
+    }
+
+    public async listCreatedOrRunning(input: Export4ListCreatedOrRunningInputDTO) {
         await ClassValidatorHelper.validate('input', input)
         return await MongoDBHelper.list<Export, 'transaction' | 'source' | 'target' | 'database', Model<Export>>(
             this.model,
@@ -263,21 +302,29 @@ export class ExportService {
         )
     }
 
-    public async getPaused(input: Export4GetPausedInputDTO) {
+    public async listPaused(input: Export4ListPausedInputDTO) {
+
         await ClassValidatorHelper.validate('input', input)
+
+        const filter: FilterQuery<Partial<Export>> = {
+            'source.name': input.source,
+            'target.name': input.target,
+            database: input.database,
+            status: ExportStatus.PAUSED
+        }
+
+        if (!StringHelper.isEmpty(input.transaction)) {
+            filter.transaction = input.transaction
+        }
+
         return await MongoDBHelper.list<Export, 'transaction' | 'source' | 'target' | 'database', Model<Export>>(
             this.model,
-            {
-                transaction: input.transaction,
-                'source.name': input.source,
-                'target.name': input.target,
-                database: input.database,
-                status: ExportStatus.PAUSED
-            }
+            filter
         )
+
     }
 
-    public async getError(input: Export4GetErrorInputDTO) {
+    public async listError(input: Export4ListErrorInputDTO) {
         await ClassValidatorHelper.validate('input', input)
         return await MongoDBHelper.list<Export, 'transaction' | 'source' | 'target' | 'database', Model<Export>>(
             this.model,

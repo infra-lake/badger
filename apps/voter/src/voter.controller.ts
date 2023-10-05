@@ -6,6 +6,7 @@ import { AuthGuard } from '@nestjs/passport'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { ApiBasicAuth, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { Request } from 'express'
+import { VoterConfigService } from './voter.config.service'
 
 @Controller('/voter')
 @ApiBasicAuth()
@@ -14,11 +15,12 @@ import { Request } from 'express'
 export class VoterController {
 
     public constructor(
+        private readonly config: VoterConfigService,
         private readonly workerService: WorkerService,
         private readonly taskService: TaskService
     ) { }
 
-    @Cron(CronExpression.EVERY_MINUTE)
+    @Cron(CronExpression.EVERY_10_SECONDS)
     @Get('/worker')
     @ApiResponse({ type: Array<WorkerDTO> })
     public async workers(@Req() context: Request, @Query() filter: Worker4SearchDTO) {
@@ -26,10 +28,17 @@ export class VoterController {
         return await this.workerService.list(_context, filter)
     }
 
-    @Cron(CronExpression.EVERY_MINUTE)
+    @Cron(CronExpression.EVERY_10_SECONDS)
     public async scale() {
-        const context = TransactionHelper.newTransactionalContext()
-        await this.taskService.scale(context)
+        if (this.config.scalling) { return }
+        try {
+            this.config.scalling = true
+            const context = TransactionHelper.newTransactionalContext()
+            await this.taskService.scale(context)
+        } finally {
+            this.config.scalling = false
+        }
+
     }
 
 }

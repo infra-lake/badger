@@ -1,6 +1,6 @@
 import { WindowDTO } from '@badger/common/window/window.dto'
-import { PickType } from '@nestjs/swagger'
-import { IsDefined, IsNotEmpty, IsOptional, IsString, IsUUID, MinLength } from 'class-validator'
+import { ApiProperty, PickType } from '@nestjs/swagger'
+import { IsDefined, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, MinLength } from 'class-validator'
 import { ExportDTO, ExportStatus } from '../export'
 
 export class TaskDTO {
@@ -48,8 +48,6 @@ export class Task4RunKeyInputDTO {
     @MinLength(2)
     public worker: string
 
-    public isToReturnCurrentRunningTask: boolean
-
 }
 
 export class Task4TerminateInputDTO extends PickType(TaskDTO, ['transaction', '_export', '_collection'] as const) {
@@ -77,30 +75,47 @@ export class Task4ListInputDTO {
 
     @IsUUID()
     @IsOptional()
+    @ApiProperty({ description: 'transation uuid', required: false })
     public transaction?: string
 
     @IsString()
     @IsOptional()
+    @ApiProperty({ description: 'task export source name', required: false })
     public source?: string
 
     @IsString()
     @IsOptional()
+    @ApiProperty({ description: 'task export target name', required: false })
     public target?: string
 
     @IsString()
     @IsOptional()
+    @ApiProperty({ description: 'task export database name', required: false })
     public database?: string
 
     @IsString()
     @IsOptional()
-    public _collection: string
+    @ApiProperty({ description: 'task collection name', required: false })
+    public _collection?: string
 
     @IsString()
     @IsOptional()
-    public status: ExportStatus
+    @ApiProperty({
+        description: 'task status',
+        required: false,
+        enum: [
+            'created',
+            'error',
+            'paused',
+            'running',
+            'terminated'
+        ]
+    })
+    public status?: ExportStatus
 
     @IsString()
     @IsOptional()
+    @ApiProperty({ description: 'worker scaled to perform task', required: false })
     public worker?: string
 
 }
@@ -140,7 +155,8 @@ export class Task4IsAllTerminatedInputDTO {
 
     @IsDefined()
     @IsNotEmpty()
-    public _export: ExportDTO
+    @IsObject()
+    public _export: any
 
 }
 
@@ -157,7 +173,7 @@ export class Task4IsAllTerminateOrErrordInputDTO {
 
 }
 
-export class Task4GetCreatedOrRunningInputDTO {
+export class Task4GetCreatedRunningOrPausedInputDTO {
 
     @IsUUID()
     @IsOptional()
@@ -252,20 +268,8 @@ export class Task4CountErrorInputDTO {
     public transaction?: string
 
     @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public source: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public target: string
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public database: string
+    @IsObject()
+    public _export: any
 
 }
 

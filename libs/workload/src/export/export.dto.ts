@@ -51,14 +51,14 @@ export class Export4CreateKeyInputDTO extends OmitType(ExportDTO, [
     @IsNotEmpty()
     @MinLength(2)
     @ApiProperty({ description: 'export source name' })
-    public source: SourceDTO['name']
+    public source: string
 
     @IsString()
     @IsDefined()
     @IsNotEmpty()
     @MinLength(2)
     @ApiProperty({ description: 'export target name' })
-    public target: TargetDTO['name']
+    public target: string
 
 }
 
@@ -155,36 +155,102 @@ export class Export4RetryInputDTO {
 
 }
 
-export class Export4ListInputhDTO {
+export class Export4GetInputDTO {
+
+    @IsUUID()
+    @IsDefined()
+    @IsNotEmpty()
+    @ApiProperty({ description: 'transation uuid' })
+    public transaction: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export source name' })
+    public source: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export target name' })
+    public target: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export source database name' })
+    public database: string
+
+}
+
+export class Export4ListInputDTO {
 
     @IsUUID()
     @IsOptional()
-    @ApiProperty({ description: 'transation uuid' })
+    @ApiProperty({ description: 'transation uuid', required: false })
     public transaction?: string
 
     @IsString()
     @IsOptional()
-    @ApiProperty({ description: 'export source name' })
+    @ApiProperty({ description: 'export source name', required: false })
     public source?: string
 
     @IsString()
     @IsOptional()
-    @ApiProperty({ description: 'export target name' })
+    @ApiProperty({ description: 'export target name', required: false })
     public target?: string
 
     @IsString()
     @IsOptional()
-    @ApiProperty({ description: 'export source database name' })
+    @ApiProperty({ description: 'export source database name', required: false })
     public database?: string
 
     @IsEnum(ExportStatus)
     @IsOptional()
-    @ApiProperty({ description: 'export status' })
+    @ApiProperty({
+        description: 'export status',
+        required: false,
+        enum: [
+            'created',
+            'error',
+            'paused',
+            'running',
+            'terminated'
+        ]
+    })
     public status?: ExportStatus
 
 }
 
-export class Export4GetCreatedOrRunningInputDTO {
+export class Export4ListCreatedRunningOrPausedInputDTO {
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export source name' })
+    public source: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export target name' })
+    public target: string
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    @ApiProperty({ description: 'export source database name' })
+    public database: string
+
+}
+
+export class Export4ListCreatedOrRunningInputDTO {
 
     @IsString()
     @IsDefined()
@@ -245,13 +311,13 @@ export class Export4IsCreatedInputDTO extends OmitType(ExportDTO, ['status'] as 
 export class Export4IsRunningInputDTO extends OmitType(ExportDTO, ['status'] as const) { }
 export class Export4GetRunningInputDTO extends OmitType(ExportDTO, ['status'] as const) { }
 
-export class Export4GetPausedInputDTO {
+export class Export4ListPausedInputDTO {
 
     @IsUUID()
     @IsDefined()
     @IsNotEmpty()
     @ApiProperty({ description: 'transation uuid' })
-    public transaction: string
+    public transaction?: string
 
     @IsString()
     @IsDefined()
@@ -276,7 +342,7 @@ export class Export4GetPausedInputDTO {
 
 }
 
-export class Export4GetErrorInputDTO {
+export class Export4ListErrorInputDTO {
 
     @IsUUID()
     @IsDefined()

@@ -13,6 +13,7 @@ import {
     ErrorExportStateService,
     PauseExportStateService,
     PlayExportStateService,
+    RetryExportStateService,
     RunExportStateService,
     TerminateExportStateService
 } from './export/service/state'
@@ -22,6 +23,7 @@ import {
     ErrorTaskStateService,
     PauseTaskStateService,
     PlayTaskStateService,
+    RetryTaskStateService,
     RunTaskStateService,
     ScaleTaskStateService,
     TerminateTaskStateService
@@ -46,6 +48,7 @@ import { WorkloadService } from './workload.service'
         ErrorExportStateService,
         PauseExportStateService,
         PlayExportStateService,
+        RetryExportStateService,
         TaskService,
         CreateTaskStateService,
         ScaleTaskStateService,
@@ -54,6 +57,7 @@ import { WorkloadService } from './workload.service'
         ErrorTaskStateService,
         PauseTaskStateService,
         PlayTaskStateService,
+        RetryTaskStateService,
         WorkerConfigService,
         WorkloadService,
         WorkerService

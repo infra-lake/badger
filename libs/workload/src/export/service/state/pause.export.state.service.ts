@@ -68,7 +68,7 @@ export class PauseExportStateService extends StateService<Export4PauseInputDTO, 
 
             await ClassValidatorHelper.validate('key', key)
 
-            const found = await this.service.getCreatedOrRunning(key)
+            const found = await this.service.listCreatedOrRunning(key)
             if (!CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'does not possible to pause export because it is not created or running')
             }

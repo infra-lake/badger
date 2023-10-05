@@ -42,8 +42,8 @@ export class RunTaskStateService extends StateService<Task4RunKeyInputDTO, undef
                     transaction: result.transaction,
                     _export: result._export,
                     _collection: result._collection,
-                    status: ExportStatus.CREATED,
-                    worker: key.worker
+                    worker: key.worker,
+                    $or: [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }]
                 },
                 { $set: { status: ExportStatus.RUNNING } },
                 { upsert: false, returnDocument: 'after', session }
@@ -63,24 +63,17 @@ export class RunTaskStateService extends StateService<Task4RunKeyInputDTO, undef
 
     private async getNextTask(context: TransactionalContext, key: Task4RunKeyInputDTO, session: ClientSession) {
 
-        let result = await this.model.findOne(
-            { status: ExportStatus.CREATED, worker: key.worker },
+        const result = await this.model.findOne(
+            {
+                worker: key.worker,
+                $or: [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }]
+            },
             undefined,
             { sort: { _id: 'asc' }, session }
         ).populate('_export') as Task4RunOutputDTO
 
         if (ObjectHelper.isEmpty(result)) {
-
-            if (!key.isToReturnCurrentRunningTask) { return undefined }
-
-            result = await this.model.findOne(
-                { status: ExportStatus.RUNNING, worker: key.worker },
-                undefined,
-                { sort: { _id: 'asc' }, session }
-            ).populate('_export') as Task4RunOutputDTO
-
-            if (ObjectHelper.isEmpty(result)) { return undefined }
-
+            return undefined
         }
 
         this.logger.debug?.(RunTaskStateService.name, context, 'trying set task to running', {

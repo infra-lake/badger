@@ -80,7 +80,7 @@ export class CreateExportStateService extends StateService<Export4CreateKeyInput
             await this.pingSource(context, key)
             await this.pingTarget(context, key)
 
-            const found = await this.service.getCreatedOrRunning(key)
+            const found = await this.service.listCreatedRunningOrPaused(key)
             if (!CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'does not possible create export because there is another export with created or running state')
             }

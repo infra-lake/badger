@@ -56,5 +56,6 @@
         "unasserted",
         "Unasserted",
         "Unbindings"
-    ]
+    ],
+    "dbt.queryLimit": 500
 }

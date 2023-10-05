@@ -3,35 +3,35 @@ import { ClassValidatorHelper, CollectionHelper, ObjectHelper, StringHelper } fr
 import { TransactionalLoggerService } from '@badger/common/logging'
 import { MongoDBHelper } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
+import { SourceDTO } from '@badger/source'
+import { TargetDTO } from '@badger/target'
 import { BadRequestException, Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { BSONType, type TransactionOptions } from 'mongodb'
 import { Model, type ClientSession, type FilterQuery } from 'mongoose'
-import { ExportDTO, ExportStatus } from '../../export'
+import { type Export, ExportDTO, ExportService, ExportStatus } from '../../export'
 import { type IWorker } from '../../worker'
 import {
-    type Task4ListInputDTO,
+    TaskDTO,
     type Task4CountCreatedOrRunningInputDTO,
     type Task4CountErrorInputDTO,
     type Task4CountPausedInputDTO,
-    type Task4GetCreatedOrRunningInputDTO,
+    type Task4GetCreatedRunningOrPausedInputDTO,
     type Task4GetDateOfLastTerminatedInputDTO,
     type Task4IsAllTerminateOrErrordInputDTO,
     type Task4IsAllTerminatedInputDTO,
     type Task4IsCreatedInputDTO,
+    type Task4ListInputDTO,
     type Task4ListRunningInputDTO,
     type Task4RunKeyInputDTO,
     type Task4TerminateInputDTO,
     type Task4TerminateKeyInputDTO,
     type Task4TerminateValueInputDTO,
     type TaskValue4ErrorKeyInputDTO,
-    type TaskValue4ErrorValueInputDTO,
-    TaskDTO
+    type TaskValue4ErrorValueInputDTO
 } from '../task.dto'
 import { Task } from '../task.entity'
 import { ErrorTaskStateService, RunTaskStateService, ScaleTaskStateService, TerminateTaskStateService } from './state'
-import { SourceDTO } from '@badger/source'
-import { TargetDTO } from '@badger/target'
 
 @Injectable()
 export class TaskService {
@@ -42,7 +42,8 @@ export class TaskService {
         @Inject(forwardRef(() => RunTaskStateService)) private readonly runService: RunTaskStateService,
         @Inject(forwardRef(() => ScaleTaskStateService)) private readonly scaleService: ScaleTaskStateService,
         @Inject(forwardRef(() => TerminateTaskStateService)) private readonly terminateService: TerminateTaskStateService,
-        @Inject(forwardRef(() => ErrorTaskStateService)) private readonly errorService: ErrorTaskStateService
+        @Inject(forwardRef(() => ErrorTaskStateService)) private readonly errorService: ErrorTaskStateService,
+        @Inject(forwardRef(() => ExportService)) private readonly exportService: ExportService
     ) { }
 
     public async next(context: TransactionalContext, key: Task4RunKeyInputDTO) {
@@ -132,24 +133,29 @@ export class TaskService {
 
         const filter: FilterQuery<Partial<Task>> = {}
 
+        let _exports: Export[] = []
+
+        if (!StringHelper.isEmpty(input.transaction) ||
+            !StringHelper.isEmpty(input.source) ||
+            !StringHelper.isEmpty(input.target) ||
+            !StringHelper.isEmpty(input.database)) {
+
+            _exports = await this.exportService.list(input, 'raw')
+
+            if (CollectionHelper.isEmpty(_exports)) { return [] }
+
+        }
+
+        if (!CollectionHelper.isEmpty(_exports)) {
+            filter.$or = _exports.map(_export => ({ _export }))
+        }
+
         if (!StringHelper.isEmpty(input.transaction)) {
             filter.transaction = input.transaction
         }
 
-        if (!StringHelper.isEmpty(input.source)) {
-            filter['_export.source.name'] = input.source
-        }
-
-        if (!StringHelper.isEmpty(input.target)) {
-            filter['_export.target.name'] = input.target
-        }
-
-        if (!StringHelper.isEmpty(input.database)) {
-            filter['_export.target.database'] = input.database
-        }
-
         if (!StringHelper.isEmpty(input._collection)) {
-            filter.status = input._collection
+            filter._collection = input._collection
         }
 
         if (!StringHelper.isEmpty(input.status)) {
@@ -157,10 +163,10 @@ export class TaskService {
         }
 
         if (!StringHelper.isEmpty(input.worker)) {
-            filter.status = input.worker
+            filter.worker = input.worker
         }
 
-        const result = await MongoDBHelper.list<Task, 'transaction' | '_export' | '_collection', Model<Task>>(this.model, filter)
+        const result = await this.model.find(filter, undefined, { populate: '_export' })
 
         const output = (result ?? []).map(({ transaction, _export, _collection, status, worker, error, count, window }) => {
 
@@ -207,19 +213,23 @@ export class TaskService {
 
         await ClassValidatorHelper.validate('input', input)
 
+        const _exports = await this.exportService.list(input, 'raw')
+
+        if (CollectionHelper.isEmpty(_exports)) {
+            throw new InvalidParameterException('input', input)
+        }
+
         const aggregation = await this.model.aggregate([
             {
                 $match: {
-                    '_export.source.name': input.source,
-                    '_export.target.name': input.target,
-                    '_export.database': input.database,
+                    $or: _exports.map(_export => ({ _export: _export._id })),
                     _collection: input._collection,
                     status: ExportStatus.TERMINATED
                 }
             },
             {
                 $group: {
-                    _id: { _export: '$_export', _collection: '$_collection' },
+                    _id: { _collection: '$_collection' },
                     value: { $max: '$window.end' }
                 }
             }
@@ -282,11 +292,11 @@ export class TaskService {
             return undefined
         }
 
-        return result
+        return result as Task
 
     }
 
-    public async isAllTerminated(input: Task4IsAllTerminatedInputDTO) {
+    public async isAllTerminated(input: Task4IsAllTerminatedInputDTO, session?: ClientSession) {
 
         await ClassValidatorHelper.validate('input', input)
 
@@ -301,14 +311,15 @@ export class TaskService {
                     { status: ExportStatus.PAUSED },
                     { status: ExportStatus.ERROR }
                 ]
-            }
+            },
+            { session }
         )
 
         return result
 
     }
 
-    public async isAllTerminatedOrError(dto: Task4IsAllTerminateOrErrordInputDTO) {
+    public async isAllTerminatedOrError(dto: Task4IsAllTerminateOrErrordInputDTO, session?: ClientSession) {
 
         await ClassValidatorHelper.validate('dto', dto)
 
@@ -320,21 +331,21 @@ export class TaskService {
                 $or: [
                     { status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }, { status: ExportStatus.PAUSED }
                 ]
-            }
+            },
+            { session }
         )
 
         return result
 
     }
 
-    public async listCreatedOrRunning(input: Task4GetCreatedOrRunningInputDTO) {
+    public async listCreatedRunningOrPaused(input: Task4GetCreatedRunningOrPausedInputDTO) {
 
         await ClassValidatorHelper.validate('input', input)
 
+        const _exports = await this.exportService.listCreatedRunningOrPaused(input)
+
         const filter: FilterQuery<Partial<Task>> = {
-            '_export.source.name': input.source,
-            '_export.target.name': input.target,
-            '_export.database': input.database,
             _collection: input._collection
         }
 
@@ -346,7 +357,12 @@ export class TaskService {
             filter.worker = input.worker
         }
 
-        filter.$or = [{ status: ExportStatus.CREATED }, { status: ExportStatus.PAUSED }]
+        filter.$or = [
+            { status: ExportStatus.CREATED },
+            { status: ExportStatus.RUNNING },
+            { status: ExportStatus.PAUSED },
+            ..._exports.map(_export => ({ _export }))
+        ]
 
         return await MongoDBHelper.list<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
             this.model,
@@ -359,11 +375,9 @@ export class TaskService {
 
         await ClassValidatorHelper.validate('input', input)
 
-        const filter: FilterQuery<Partial<Task>> = {
-            '_export.source.name': input.source,
-            '_export.target.name': input.target,
-            '_export.database': input.database
-        }
+        const _exports = await this.exportService.listCreatedOrRunning(input)
+
+        const filter: FilterQuery<Partial<Task>> = {}
 
         if (!StringHelper.isEmpty(input.transaction)) {
             filter.transaction = input.transaction
@@ -373,7 +387,11 @@ export class TaskService {
             filter.worker = input.worker
         }
 
-        filter.$or = [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }]
+        filter.$or = [
+            // eslint-disable-next-line array-element-newline
+            { status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING },
+            ..._exports.map(_export => ({ _export }))
+        ]
 
         return await MongoDBHelper.count<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
             this.model,
@@ -387,17 +405,19 @@ export class TaskService {
 
         await ClassValidatorHelper.validate('input', input)
 
-        const filter: FilterQuery<Partial<Task>> = {
-            '_export.source.name': input.source,
-            '_export.target.name': input.target,
-            '_export.database': input.database
-        }
+        const _exports = await this.exportService.listPaused(input)
+
+        const filter: FilterQuery<Partial<Task>> = {}
 
         if (!StringHelper.isEmpty(input.transaction)) {
             filter.transaction = input.transaction
         }
 
-        filter.status = ExportStatus.PAUSED
+        filter.$or = [
+            // eslint-disable-next-line array-element-newline
+            { status: ExportStatus.PAUSED },
+            ..._exports.map(_export => ({ _export }))
+        ]
 
         return await MongoDBHelper.count<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
             this.model,
@@ -412,9 +432,7 @@ export class TaskService {
         await ClassValidatorHelper.validate('input', input)
 
         const filter: FilterQuery<Partial<Task>> = {
-            '_export.source.name': input.source,
-            '_export.target.name': input.target,
-            '_export.database': input.database
+            _export: input._export
         }
 
         if (!StringHelper.isEmpty(input.transaction)) {
@@ -423,11 +441,13 @@ export class TaskService {
 
         filter.status = ExportStatus.ERROR
 
-        return await MongoDBHelper.count<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
+        const result = await MongoDBHelper.count<Task, 'transaction' | '_export' | '_collection', Model<Task>>(
             this.model,
             filter,
             { session }
         )
+
+        return result
 
     }
 

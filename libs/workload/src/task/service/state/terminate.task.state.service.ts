@@ -56,9 +56,9 @@ export class TerminateTaskStateService extends StateService<Task4TerminateKeyInp
                 { upsert: false, returnDocument: 'after', session }
             )
 
-            if (await this.service.isAllTerminated(key)) {
+            if (await this.service.isAllTerminated(key, session)) {
                 await this.terminateExportService.apply(context, key._export)
-            } else if (await this.service.isAllTerminatedOrError(key)) {
+            } else if (await this.service.isAllTerminatedOrError(key, session)) {
                 await this.errorExportService.apply(context, key._export)
             }
 

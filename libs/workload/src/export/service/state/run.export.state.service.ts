@@ -41,8 +41,7 @@ export class RunExportStateService extends StateService<Export4RunKeyInputDTO, u
                     transaction: key.transaction,
                     source: key.source,
                     target: key.target,
-                    database: key.database,
-                    status: ExportStatus.CREATED
+                    database: key.database
                 },
                 { $set: { status: ExportStatus.RUNNING } },
                 { upsert: false, returnDocument: 'after', session }
@@ -67,14 +66,6 @@ export class RunExportStateService extends StateService<Export4RunKeyInputDTO, u
         try {
 
             await ClassValidatorHelper.validate('key', key)
-
-            if (await this.service.isRunning(key, session)) {
-                return
-            }
-
-            if (!await this.service.isCreated(key, session)) {
-                throw new InvalidParameterException('export', key, 'does not possible to run export because it is not created')
-            }
 
         } catch (error) {
             throw new InvalidStateChangeException(error)

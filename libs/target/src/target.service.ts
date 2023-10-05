@@ -116,6 +116,7 @@ export class TargetService {
 
         const table = {
             sourceFormat: 'NEWLINE_DELIMITED_JSON',
+            recreate: isTemporaryTable,
             name,
             fields: [
                 { name: StampsHelper.DEFAULT_STAMP_ID, type: 'STRING', mode: 'REQUIRED' },
