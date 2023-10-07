@@ -1,7 +1,7 @@
 import { AuthConfigService } from '@badger/common/auth'
 import { ObjectHelper } from '@badger/common/helper'
 import { TransactionDTO } from '@badger/common/transaction'
-import { Export4CheckInputDTO, Export4CheckOutputDTO, Export4CreateKeyInputDTO, Export4ListInputDTO, Export4PauseInputDTO, Export4PlayInputDTO, Export4RetryInputDTO, ExportService, Task4ListInputDTO, TaskService, type ExportDTO, type TaskDTO } from '@badger/workload'
+import { Export4CheckOutputDTO, Export4FlatKeyDTO, Export4FlatKeyWithoutTransactionDTO, Export4ListInputDTO, type ExportDTO, ExportService, Task4ListInputDTO, type TaskDTO, TaskService } from '@badger/workload'
 import { Body, Controller, Get, Inject, NotFoundException, Post, Query, Req, UseGuards, UsePipes, ValidationPipe, forwardRef } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { ApiBasicAuth, ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger'
@@ -20,9 +20,9 @@ export class ExportController {
 
     @Post('/create')
     @UsePipes(ValidationPipe)
-    @ApiBody({ type: Export4CreateKeyInputDTO, required: true })
+    @ApiBody({ type: Export4FlatKeyWithoutTransactionDTO, required: true })
     @ApiResponse({ type: TransactionDTO })
-    public async create(@Req() context: Request, @Body() input: Export4CreateKeyInputDTO) {
+    public async create(@Req() context: Request, @Body() input: Export4FlatKeyWithoutTransactionDTO) {
         return await this.exportService.create(context, input)
     }
 
@@ -34,40 +34,40 @@ export class ExportController {
 
     @Post('/play')
     @ApiResponse({ type: TransactionDTO })
-    public async play(@Req() context: Request, @Body() input: Export4PlayInputDTO) {
+    public async play(@Req() context: Request, @Body() input: Export4FlatKeyDTO) {
         return await this.exportService.play(context, input)
     }
 
     @Post('/pause')
     @ApiResponse({ type: TransactionDTO })
-    public async pause(@Req() context: Request, @Body() input: Export4PauseInputDTO) {
+    public async pause(@Req() context: Request, @Body() input: Export4FlatKeyDTO) {
         return await this.exportService.pause(context, input)
     }
 
     @Post('/retry')
     @ApiResponse({ type: TransactionDTO })
-    public async retry(@Req() context: Request, @Body() input: Export4RetryInputDTO) {
+    public async retry(@Req() context: Request, @Body() input: Export4FlatKeyDTO) {
         return await this.exportService.retry(context, input)
     }
 
     @Get()
     @ApiResponse({ type: Array<ExportDTO> })
-    public async exports(@Query() input: Export4ListInputDTO) {
-        const output = await this.exportService.list(input, 'dto')
+    public async exports(@Req() context: Request, @Query() input: Export4ListInputDTO) {
+        const output = await this.exportService.list(context, input, 'dto')
         return output
     }
 
     @Get('/tasks')
     @ApiResponse({ type: Array<TaskDTO> })
-    public async tasks(@Query() input: Task4ListInputDTO) {
-        const output = await this.taskService.list(input)
+    public async tasks(@Req() context: Request, @Query() input: Task4ListInputDTO) {
+        const output = await this.taskService.list(context, input)
         return output
     }
 
     @Get('/check')
     @ApiResponse({ type: Export4CheckOutputDTO })
-    public async check(@Query() input: Export4CheckInputDTO) {
-        const output = await this.exportService.check(input) as Export4CheckOutputDTO
+    public async check(@Req() context: Request, @Query() input: Export4FlatKeyDTO) {
+        const output = await this.exportService.check(context, input) as Export4CheckOutputDTO
         if (ObjectHelper.isEmpty(output)) {
             throw new NotFoundException('Export not found')
         }

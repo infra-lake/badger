@@ -9,24 +9,41 @@ import { MongooseModule } from '@nestjs/mongoose'
 import { ExportService } from './export'
 import { Export } from './export/export.entity'
 import {
+    Export2Export4CheckOutputDTOConverterService,
+    Export2ExportDTOConverterService,
+    Export2FilterQueryExportConverterService,
+    Export4FlatKeyDTO2FilterQueryExportConverterService,
+    Export4ListInputDTO2FilterQueryExportConverterService,
+    TaskKeyDTO2FilterQueryExportConverterService
+} from './export/service/converter'
+import {
+    CleanupExportStateService,
     CreateExportStateService,
     ErrorExportStateService,
     PauseExportStateService,
-    PlayExportStateService,
     RetryExportStateService,
     RunExportStateService,
-    TerminateExportStateService
+    TerminateExportStateService,
+    UnpauseExportStateService
 } from './export/service/state'
 import { Task, TaskService } from './task'
 import {
+    Task2TaskDTOConverterService,
+    Task4FlatKeyDTO2FilterQueryTaskConverterService,
+    Task4ListInputDTO2FilterQueryTaskConverterService,
+    TaskKey4CreateInputDTO2Task4FlatKeyDTOConverterService,
+    TaskKeyDTO2FilterQueryTaskConverterService
+} from './task/service/converter'
+import {
+    CleanupTaskStateService,
     CreateTaskStateService,
     ErrorTaskStateService,
     PauseTaskStateService,
-    PlayTaskStateService,
     RetryTaskStateService,
     RunTaskStateService,
     ScaleTaskStateService,
-    TerminateTaskStateService
+    TerminateTaskStateService,
+    UnpauseTaskStateService
 } from './task/service/state'
 import { WorkerConfigService, WorkerService } from './worker'
 import { WorkloadService } from './workload.service'
@@ -41,14 +58,27 @@ import { WorkloadService } from './workload.service'
         TargetModule
     ],
     providers: [
+        Export2ExportDTOConverterService,
+        Export2FilterQueryExportConverterService,
+        TaskKeyDTO2FilterQueryTaskConverterService,
+        Export2Export4CheckOutputDTOConverterService,
+        TaskKeyDTO2FilterQueryExportConverterService,
+        Export4FlatKeyDTO2FilterQueryExportConverterService,
+        Export4ListInputDTO2FilterQueryExportConverterService,
         ExportService,
         CreateExportStateService,
         RunExportStateService,
         TerminateExportStateService,
         ErrorExportStateService,
         PauseExportStateService,
-        PlayExportStateService,
+        UnpauseExportStateService,
         RetryExportStateService,
+        CleanupExportStateService,
+        Task2TaskDTOConverterService,
+        TaskKeyDTO2FilterQueryTaskConverterService,
+        Task4FlatKeyDTO2FilterQueryTaskConverterService,
+        Task4ListInputDTO2FilterQueryTaskConverterService,
+        TaskKey4CreateInputDTO2Task4FlatKeyDTOConverterService,
         TaskService,
         CreateTaskStateService,
         ScaleTaskStateService,
@@ -56,12 +86,12 @@ import { WorkloadService } from './workload.service'
         TerminateTaskStateService,
         ErrorTaskStateService,
         PauseTaskStateService,
-        PlayTaskStateService,
+        UnpauseTaskStateService,
         RetryTaskStateService,
+        CleanupTaskStateService,
         WorkerConfigService,
         WorkloadService,
         WorkerService
-
     ],
     exports: [
         ExportService,

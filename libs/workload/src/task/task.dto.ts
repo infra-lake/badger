@@ -1,7 +1,8 @@
 import { WindowDTO } from '@badger/common/window/window.dto'
-import { ApiProperty, PickType } from '@nestjs/swagger'
-import { IsDefined, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, MinLength } from 'class-validator'
-import { ExportDTO, ExportStatus } from '../export'
+import { ApiProperty, OmitType } from '@nestjs/swagger'
+import { IsDefined, IsNotEmpty, IsOptional, IsString, IsUUID, MinLength } from 'class-validator'
+import { Export, ExportDTO, ExportStatus } from '../export'
+import { Export4FlatKeyDTO, Export4FlatKeyWithOptionalTransactionDTO } from '../export/export.dto'
 
 export class TaskDTO {
 
@@ -41,6 +42,80 @@ export class TaskDTO {
 
 }
 
+export class Task4FlatKeyDTO extends Export4FlatKeyDTO {
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    public _collection: string
+
+    @IsOptional()
+    @IsString()
+    @MinLength(2)
+    public worker?: string
+
+}
+
+export class Task4FlatKeyWithOptionalTransactionDTO extends Export4FlatKeyWithOptionalTransactionDTO {
+
+    @IsString()
+    @IsDefined()
+    @IsNotEmpty()
+    @MinLength(2)
+    public _collection: string
+
+    @IsOptional()
+    @IsString()
+    @MinLength(2)
+    public worker?: string
+
+}
+
+export class TaskKeyDTO {
+
+    @IsUUID()
+    @IsDefined()
+    @IsNotEmpty()
+    public transaction: string
+
+    @IsDefined()
+    @IsNotEmpty()
+    public _export: Export
+
+    @IsString()
+    @IsOptional()
+    public _collection: string
+
+    @IsOptional()
+    @IsString()
+    @MinLength(2)
+    public worker?: string
+
+}
+
+export class TaskKeyWithOptionalCollectionDTO {
+
+    @IsUUID()
+    @IsDefined()
+    @IsNotEmpty()
+    public transaction: string
+
+    @IsDefined()
+    @IsNotEmpty()
+    public _export: Export
+
+    @IsString()
+    @IsOptional()
+    public _collection?: string
+
+    @IsOptional()
+    @IsString()
+    @MinLength(2)
+    public worker?: string
+
+}
+
 export class Task4RunKeyInputDTO {
 
     @IsDefined()
@@ -50,21 +125,29 @@ export class Task4RunKeyInputDTO {
 
 }
 
-export class Task4TerminateInputDTO extends PickType(TaskDTO, ['transaction', '_export', '_collection'] as const) {
+export class TaskWithWorkerDTO extends OmitType(TaskDTO, ['_export', 'worker'] as const) {
+
     @IsDefined()
-    @IsString()
+    @IsNotEmpty()
+    public _export: Export
+
+    @IsDefined()
+    @IsNotEmpty()
     @MinLength(2)
     public worker: string
+
 }
 
-export class TaskValue4ErrorKeyInputDTO extends PickType(TaskDTO, ['transaction', '_export', '_collection'] as const) { }
-
-export class TaskValue4ErrorValueInputDTO {
+export class Task4ScaleValueInputDTO {
 
     @IsDefined()
-    @IsString()
+    @IsNotEmpty()
     @MinLength(2)
     public worker: string
+
+}
+
+export class TaskValue4ErrorValueInputDTO {
 
     @IsDefined()
     public error: any
@@ -117,261 +200,5 @@ export class Task4ListInputDTO {
     @IsOptional()
     @ApiProperty({ description: 'worker scaled to perform task', required: false })
     public worker?: string
-
-}
-
-export class Task4GetDateOfLastTerminatedInputDTO {
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public source: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public target: string
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public database: string
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public _collection: string
-
-}
-
-export class Task4IsAllTerminatedInputDTO {
-
-    @IsUUID()
-    @IsDefined()
-    @IsNotEmpty()
-    public transaction: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @IsObject()
-    public _export: any
-
-}
-
-export class Task4IsAllTerminateOrErrordInputDTO {
-
-    @IsUUID()
-    @IsDefined()
-    @IsNotEmpty()
-    public transaction: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    public _export: ExportDTO
-
-}
-
-export class Task4GetCreatedRunningOrPausedInputDTO {
-
-    @IsUUID()
-    @IsOptional()
-    public transaction?: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public source: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public target: string
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public database: string
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public _collection: string
-
-    @IsOptional()
-    @IsString()
-    @MinLength(2)
-    public worker?: string
-
-}
-
-export class Task4CountCreatedOrRunningInputDTO {
-
-    @IsUUID()
-    @IsOptional()
-    public transaction?: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public source: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public target: string
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public database: string
-
-    @IsOptional()
-    @IsString()
-    @MinLength(2)
-    public worker?: string
-
-}
-
-export class Task4CountPausedInputDTO {
-
-    @IsUUID()
-    @IsOptional()
-    public transaction?: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public source: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public target: string
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public database: string
-
-}
-
-export class Task4CountErrorInputDTO {
-
-    @IsUUID()
-    @IsOptional()
-    public transaction?: string
-
-    @IsDefined()
-    @IsObject()
-    public _export: any
-
-}
-
-export class Task4IsCreatedInputDTO extends PickType(TaskDTO, ['transaction', '_export', '_collection'] as const) { }
-
-export class Task4ListRunningInputDTO {
-
-    @IsUUID()
-    @IsDefined()
-    @IsNotEmpty()
-    public transaction: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    public _export: ExportDTO
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public _collection: string
-
-    @IsOptional()
-    @IsString()
-    @MinLength(2)
-    public worker?: string
-
-}
-
-export class Task4RunOutputDTO {
-
-    @IsUUID()
-    @IsDefined()
-    @IsNotEmpty()
-    public transaction: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    public _export: ExportDTO
-
-    @IsString()
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public _collection: string
-
-    // @IsEnum(ExportStatus)
-    @IsDefined()
-    @IsNotEmpty()
-    public status: ExportStatus
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public worker: string
-
-    @IsOptional()
-    error?: any
-
-    @IsOptional()
-    count?: number
-
-    @IsOptional()
-    window?: WindowDTO
-
-}
-
-export class TaskKey4CreateInputDTO {
-
-    @IsUUID()
-    @IsDefined()
-    @IsNotEmpty()
-    public transaction: string
-
-    @IsDefined()
-    @IsNotEmpty()
-    public _export: ExportDTO
-
-    @IsString()
-    @IsOptional()
-    public _collection?: string
-
-}
-
-export class Task4ScaleKeyInputDTO extends PickType(TaskDTO, ['transaction', '_export', '_collection'] as const) { }
-
-export class Task4ScaleValueInputDTO {
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public worker: string
-
-}
-
-export class Task4TerminateKeyInputDTO extends PickType(TaskDTO, ['transaction', '_export', '_collection'] as const) { }
-
-export class Task4TerminateValueInputDTO {
-
-    @IsDefined()
-    @IsNotEmpty()
-    @MinLength(2)
-    public worker: string
 
 }

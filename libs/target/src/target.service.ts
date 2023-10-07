@@ -154,7 +154,7 @@ export class TargetService {
             SELECT temporary.${StampsHelper.DEFAULT_STAMP_ID}, temporary.${StampsHelper.DEFAULT_STAMP_INSERT}, temporary.data, temporary.\`hash\`
             FROM temporary
             WHERE temporary.${StampsHelper.DEFAULT_STAMP_ID} NOT IN (SELECT main.${StampsHelper.DEFAULT_STAMP_ID} FROM main)
-                OR \`hash\` <> (
+                OR \`hash\` NOT IN (
                     SELECT \`hash\`
                     FROM main AS B
                     INNER JOIN ${mainTableName} AS C

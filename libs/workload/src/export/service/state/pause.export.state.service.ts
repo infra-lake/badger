@@ -1,20 +1,19 @@
 import { InvalidParameterException, InvalidStateChangeException } from '@badger/common/exception'
 import { ClassValidatorHelper, CollectionHelper, ObjectHelper } from '@badger/common/helper'
 import { TransactionalLoggerService } from '@badger/common/logging'
-import { MongoDBHelper } from '@badger/common/mongodb'
+import { WithTransaction } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { StateService } from '@badger/common/types'
 import { PauseTaskStateService } from '@badger/workload/task/service/state'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
-import { type TransactionOptions } from 'mongodb'
-import { Model } from 'mongoose'
-import { type Export4PauseInputDTO } from '../../export.dto'
+import { ClientSession, Model } from 'mongoose'
+import { type Export4FlatKeyDTO } from '../../export.dto'
 import { Export, ExportStatus } from '../../export.entity'
 import { ExportService } from '../export.service'
 
 @Injectable()
-export class PauseExportStateService extends StateService<Export4PauseInputDTO, undefined> {
+export class PauseExportStateService extends StateService<Export4FlatKeyDTO> {
 
     public constructor(
         logger: TransactionalLoggerService,
@@ -23,52 +22,42 @@ export class PauseExportStateService extends StateService<Export4PauseInputDTO, 
         @Inject(forwardRef(() => PauseTaskStateService)) private readonly pauseTask: PauseTaskStateService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: Export4PauseInputDTO): Promise<void> {
+    @WithTransaction(Export.name)
+    public async change(context: TransactionalContext, key: Export4FlatKeyDTO, value?: undefined, session?: ClientSession): Promise<void> {
 
-        this.logger.log(PauseExportStateService.name, context, 'pausing export', { key })
+        await this.validate(context, key, session)
 
-        const options: TransactionOptions = { writeConcern: { w: 'majority' } }
+        const _export = await this.model.findOneAndUpdate(
+            {
+                transaction: key.transaction,
+                'source.name': key.source,
+                'target.name': key.target,
+                database: key.database,
+                $or: [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }]
+            },
+            { $set: { status: ExportStatus.PAUSED } },
+            { upsert: false, returnDocument: 'after', session }
+        ) as Export
 
-        await MongoDBHelper.withTransaction(this.model, async (session) => {
-
-            await this.validate(context, key)
-
-            await this.model.findOneAndUpdate(
-                {
-                    transaction: key.transaction,
-                    'source.name': key.source,
-                    'target.name': key.target,
-                    database: key.database,
-                    $or: [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }]
-                },
-                { $set: { status: ExportStatus.PAUSED } },
-                { upsert: false, returnDocument: 'after', session }
-            )
-
-            await this.pauseTask.apply(context, key)
-
-        }, options)
-
-        this.logger.log(PauseExportStateService.name, context, 'export is paused successfully', {
-            transaction: key.transaction,
-            source: key.source,
-            target: key.target,
-            database: key.database
-        })
+        await this.pauseTask.apply(context, _export, undefined)
 
     }
 
-    protected async validate(context: TransactionalContext, key: Export4PauseInputDTO): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Export4FlatKeyDTO, session?: ClientSession): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
+        }
+
+        if (ObjectHelper.isEmpty(session)) {
+            throw new InvalidParameterException('session', session)
         }
 
         try {
 
             await ClassValidatorHelper.validate('key', key)
 
-            const found = await this.service.listCreatedOrRunning(key)
+            const found = await this.service.listWithStatus(context, key, [ExportStatus.CREATED, ExportStatus.RUNNING], 'dto')
             if (!CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'does not possible to pause export because it is not created or running')
             }
@@ -78,5 +67,11 @@ export class PauseExportStateService extends StateService<Export4PauseInputDTO, 
         }
 
     }
+
+    protected async before(context: TransactionalContext, { transaction, source, target, database }: Export4FlatKeyDTO) {
+        this.logger.log(PauseExportStateService.name, context, 'key', { transaction, source, target, database })
+    }
+
+    protected async after() { }
 
 }

@@ -1,59 +1,41 @@
 import { InvalidParameterException, InvalidStateChangeException } from '@badger/common/exception'
 import { ClassValidatorHelper, ObjectHelper } from '@badger/common/helper'
 import { TransactionalLoggerService } from '@badger/common/logging'
-import { MongoDBHelper } from '@badger/common/mongodb'
+import { WithTransaction } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { StateService } from '@badger/common/types'
-import { Inject, Injectable, forwardRef } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
-import { type TransactionOptions } from 'mongodb'
 import { Model, type ClientSession } from 'mongoose'
-import { type Export4RunKeyInputDTO } from '../../export.dto'
 import { Export, ExportStatus } from '../../export.entity'
-import { ExportService } from '../export.service'
 
 @Injectable()
-export class RunExportStateService extends StateService<Export4RunKeyInputDTO, undefined> {
+export class RunExportStateService extends StateService<Export> {
 
     public constructor(
         logger: TransactionalLoggerService,
-        @InjectModel(Export.name) private readonly model: Model<Export>,
-        @Inject(forwardRef(() => ExportService)) private readonly service: ExportService
+        @InjectModel(Export.name) private readonly model: Model<Export>
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: Export4RunKeyInputDTO): Promise<void> {
+    @WithTransaction(Export.name)
+    public async change(context: TransactionalContext, key: Export, value?: undefined, session?: ClientSession): Promise<void> {
 
-        this.logger.log(RunExportStateService.name, context, 'running export', {
-            transaction: key.transaction,
-            source: key.source.name,
-            target: key.target.name,
-            database: key.database
-        })
+        await this.validate(context, key, session)
 
-        const options: TransactionOptions = { writeConcern: { w: 'majority' } }
-
-        await MongoDBHelper.withTransaction(this.model, async (session) => {
-
-            await this.validate(context, key, session)
-
-            await this.model.findOneAndUpdate(
-                {
-                    transaction: key.transaction,
-                    source: key.source,
-                    target: key.target,
-                    database: key.database
-                },
-                { $set: { status: ExportStatus.RUNNING } },
-                { upsert: false, returnDocument: 'after', session }
-            )
-
-        }, options)
-
-        this.logger.log(RunExportStateService.name, context, 'export is set to running')
+        await this.model.findOneAndUpdate(
+            {
+                transaction: key.transaction,
+                source: key.source,
+                target: key.target,
+                database: key.database
+            },
+            { $set: { status: ExportStatus.RUNNING } },
+            { upsert: false, returnDocument: 'after', session }
+        )
 
     }
 
-    protected async validate(context: TransactionalContext, key: Export4RunKeyInputDTO, session?: ClientSession): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Export, session?: ClientSession): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
@@ -72,5 +54,16 @@ export class RunExportStateService extends StateService<Export4RunKeyInputDTO, u
         }
 
     }
+
+    protected async before(context: TransactionalContext, { transaction, source, target, database }: Export) {
+        this.logger.log(RunExportStateService.name, context, 'key', {
+            transaction,
+            source: source.name,
+            target: target.name,
+            database
+        })
+    }
+
+    protected async after() { }
 
 }

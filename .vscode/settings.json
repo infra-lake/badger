@@ -45,7 +45,8 @@
         "logging": "log",
         "metrics": "shared",
         "window": "tasks",
-        "transaction": "animation"
+        "transaction": "animation",
+        "converter": "delta"
     },
     "cSpell.words": [
         "acked",

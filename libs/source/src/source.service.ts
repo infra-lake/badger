@@ -84,7 +84,7 @@ export class SourceService {
     public async getCollections(source: SourceKeyDTO, database: string, filter?: ICollectionsFilter) {
         const client = await this.connect(source)
         const result = await MongoDBHelper.collections(client, database, filter)
-        return result
+        return result.map(({ collectionName: _collection }) => _collection)
     }
 
     public async connect(dto: SourceKeyDTO | SourceDTO) {

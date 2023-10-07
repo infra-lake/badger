@@ -6,7 +6,7 @@ import { Source4DownloadDocumentsDTO, SourceService } from '@badger/source'
 import { Target4UploadDocumentsDTO, TargetService } from '@badger/target'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { type ClientSession } from 'mongoose'
-import { Task4RunKeyInputDTO, TaskService, type Task4RunOutputDTO } from '../task'
+import { Task4RunKeyInputDTO, TaskService, type TaskWithWorkerDTO } from '../task'
 import { WorkerConfigService } from './worker.config.service'
 import { WorkerStatus, type IWorker } from './worker.contract'
 import { type Worker4SearchDTO } from './worker.dto'
@@ -25,19 +25,21 @@ export class WorkerService {
 
         if (this.config.working) { return }
 
-        const task = await this.getNextTask(context)
+        this.config.working = true
 
-        if (ObjectHelper.isEmpty(task)) { return }
+        const task = await this.getNextTask(context)
 
         try {
 
-            this.config.working = true
+            if (ObjectHelper.isEmpty(task)) {
+                return
+            }
 
             await ResilienceHelper.tryToRun(context, 5, this.perform.bind(this), task, new Date())
 
         } catch (error) {
 
-            await this.taskService.error(context, task, { error, worker: this.config.getCurrentWorkerName() })
+            await this.taskService.error(context, task, error)
 
         } finally {
 
@@ -50,11 +52,11 @@ export class WorkerService {
     private async getNextTask(context: TransactionalContext) {
         const dto = new Task4RunKeyInputDTO()
         dto.worker = this.config.getCurrentWorkerName()
-        const result = await this.taskService.next(context, dto) as Task4RunOutputDTO
+        const result = await this.taskService.next(context, dto) as TaskWithWorkerDTO
         return result
     }
 
-    private async perform(context: TransactionalContext, task: Task4RunOutputDTO, date: Date) {
+    private async perform(context: TransactionalContext, task: TaskWithWorkerDTO, date: Date) {
 
         const downloadDTO = new Source4DownloadDocumentsDTO()
         downloadDTO.name = task._export.source.name

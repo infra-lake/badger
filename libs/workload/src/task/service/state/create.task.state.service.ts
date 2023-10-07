@@ -1,91 +1,81 @@
 import { InvalidParameterException, InvalidStateChangeException } from '@badger/common/exception'
 import { ClassValidatorHelper, CollectionHelper, ObjectHelper, StringHelper } from '@badger/common/helper'
 import { TransactionalLoggerService } from '@badger/common/logging'
-import { MongoDBHelper } from '@badger/common/mongodb'
+import { WithTransaction } from '@badger/common/mongodb'
 import { type TransactionalContext } from '@badger/common/transaction'
 import { StateService } from '@badger/common/types'
 import { SourceService } from '@badger/source'
+import { Export, ExportStatus } from '@badger/workload/export'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
-import { type TransactionOptions } from 'mongodb'
-import { Model } from 'mongoose'
-import { Task4GetCreatedRunningOrPausedInputDTO, type TaskKey4CreateInputDTO } from '../../task.dto'
-import { ExportStatus } from '@badger/workload/export'
+import { ClientSession, Model } from 'mongoose'
 import { Task } from '../../task.entity'
 import { TaskService } from '../task.service'
+import { TaskKey4CreateInputDTO2Task4FlatKeyDTOConverterService } from '../converter'
 @Injectable()
-export class CreateTaskStateService extends StateService<TaskKey4CreateInputDTO, unknown> {
+export class CreateTaskStateService extends StateService<Export, string | undefined> {
 
     public constructor(
         logger: TransactionalLoggerService,
         @InjectModel(Task.name) private readonly model: Model<Task>,
         @Inject(forwardRef(() => TaskService)) private readonly service: TaskService,
-        private readonly sourceService: SourceService
+        private readonly sourceService: SourceService,
+        private readonly taskKey4CreateInputDTO2Task4FlatKeyDTOConverter: TaskKey4CreateInputDTO2Task4FlatKeyDTOConverterService
     ) { super(logger) }
 
-    public async apply(context: TransactionalContext, key: TaskKey4CreateInputDTO): Promise<void> {
+    @WithTransaction(Task.name)
+    public async change(context: TransactionalContext, key: Export, value: undefined, session?: ClientSession): Promise<void> {
 
-        this.logger.debug?.(CreateTaskStateService.name, context, 'creating tasks')
+        await this.validate(context, key, undefined, session)
 
-        const options: TransactionOptions = { writeConcern: { w: 'majority' } }
-
-        await MongoDBHelper.withTransaction(this.model, async (session) => {
-
-            await this.validate(context, key)
-
-            const collections = await this.getCollectionsFrom(key)
-
-            await Promise.all(collections.map(async _collection => {
-
-                const { transaction, _export } = key
-
-                const _key = { transaction, _export, _collection }
-
-                await this.validate(context, _key)
-
-                this.logger.debug?.(CreateTaskStateService.name, context, 'creating task', { _collection })
-
-                await this.model.findOneAndUpdate(
-                    {
-                        transaction,
-                        _export,
-                        _collection,
-                        $or: [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }]
-                    },
-                    { $setOnInsert: { transaction, _export, _collection, status: ExportStatus.CREATED } },
-                    { upsert: true, returnDocument: 'after', session }
-                )
-
-            }))
-
-        }, options)
-
-        this.logger.debug?.(CreateTaskStateService.name, context, 'all tasks are already successfully created')
-
-    }
-
-    private async getCollectionsFrom(key: TaskKey4CreateInputDTO) {
-        const result = await this.sourceService.getCollections(
-            key._export.source,
-            key._export.database,
-            key._export.source.filter
+        const collections = await this.sourceService.getCollections(
+            key.source,
+            key.database,
+            key.source.filter
         )
-        return result.map(({ collectionName: _collection }) => _collection)
+
+        await Promise.all(collections.map(async _collection => {
+
+            await this.validate(context, key, _collection, session)
+
+            this.logger.log(CreateTaskStateService.name, context, 'creating task', { _collection })
+
+            await this.model.findOneAndUpdate(
+                {
+                    transaction: key.transaction,
+                    _export: key,
+                    _collection,
+                    $or: [{ status: ExportStatus.CREATED }, { status: ExportStatus.RUNNING }]
+                },
+                { $setOnInsert: { transaction: key.transaction, _export: key, _collection, status: ExportStatus.CREATED } },
+                { upsert: true, returnDocument: 'after', session }
+            )
+
+        }))
+
     }
 
-    protected async validate(context: TransactionalContext, key: TaskKey4CreateInputDTO): Promise<void> {
+    protected async validate(context: TransactionalContext, key: Export, value?: string, session?: ClientSession): Promise<void> {
 
         if (ObjectHelper.isEmpty(context)) {
             throw new InvalidParameterException('context', context)
+        }
+
+        if (ObjectHelper.isEmpty(session)) {
+            throw new InvalidParameterException('session', session)
         }
 
         try {
 
             await ClassValidatorHelper.validate('key', key)
 
-            if (StringHelper.isEmpty(key._collection)) { return }
+            if (StringHelper.isEmpty(value)) { return }
 
-            const found = await this.getCreatedOrRunningFrom(key)
+            const filter = await this.taskKey4CreateInputDTO2Task4FlatKeyDTOConverter.convert(context, {
+                _export: key,
+                _collection: value as string
+            })
+            const found = await this.service.listWithStatus(context, filter, [ExportStatus.CREATED, ExportStatus.RUNNING, ExportStatus.PAUSED], 'dto')
             if (!CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'does not possible create task because there is another task with created or running state')
             }
@@ -96,16 +86,8 @@ export class CreateTaskStateService extends StateService<TaskKey4CreateInputDTO,
 
     }
 
-    private async getCreatedOrRunningFrom(key: TaskKey4CreateInputDTO) {
+    protected async before() { }
 
-        const filter = new Task4GetCreatedRunningOrPausedInputDTO()
-        filter.source = key._export.source.name
-        filter.target = key._export.target.name
-        filter.database = key._export.database
-        filter._collection = key._collection as string
-
-        return await this.service.listCreatedRunningOrPaused(filter)
-
-    }
+    protected async after() { }
 
 }
