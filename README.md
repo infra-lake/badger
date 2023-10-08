@@ -7,7 +7,7 @@
 
   <p align="center">Badger is a tool that export MongoDB data to Google BigQuery.</p>
     <p align="center">
-<img src="https://img.shields.io/github/realese/infra-lake/badger.svg" alt="Release" />
+<img src="https://img.shields.io/github/v/release/infra-lake/badger.svg?style=flat" alt="Release" />
 </p>
 
 ## Description
