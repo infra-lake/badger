@@ -26,28 +26,28 @@ export class ExportController {
         return await this.exportService.create(context, input)
     }
 
-    @Post('/cleanup')
-    @ApiResponse({ type: TransactionDTO })
-    public async cleanup(@Req() context: Request) {
-        return await this.exportService.cleanup(context)
-    }
-
-    @Post('/play')
-    @ApiResponse({ type: TransactionDTO })
-    public async play(@Req() context: Request, @Body() input: Export4FlatKeyDTO) {
-        return await this.exportService.play(context, input)
-    }
-
     @Post('/pause')
     @ApiResponse({ type: TransactionDTO })
     public async pause(@Req() context: Request, @Body() input: Export4FlatKeyDTO) {
         return await this.exportService.pause(context, input)
     }
 
+    @Post('/unpause')
+    @ApiResponse({ type: TransactionDTO })
+    public async unpause(@Req() context: Request, @Body() input: Export4FlatKeyDTO) {
+        return await this.exportService.unpause(context, input)
+    }
+
     @Post('/retry')
     @ApiResponse({ type: TransactionDTO })
     public async retry(@Req() context: Request, @Body() input: Export4FlatKeyDTO) {
         return await this.exportService.retry(context, input)
+    }
+
+    @Post('/cleanup')
+    @ApiResponse({ type: TransactionDTO })
+    public async cleanup(@Req() context: Request) {
+        return await this.exportService.cleanup(context)
     }
 
     @Get()
@@ -57,7 +57,7 @@ export class ExportController {
         return output
     }
 
-    @Get('/tasks')
+    @Get('/task')
     @ApiResponse({ type: Array<TaskDTO> })
     public async tasks(@Req() context: Request, @Query() input: Task4ListInputDTO) {
         const output = await this.taskService.list(context, input)

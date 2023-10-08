@@ -13,6 +13,10 @@ export class WorkerConfigService {
         private readonly http: HttpService
     ) { }
 
+    public get retries() {
+        return parseInt(this.config.get<number>('WORKER_TASK_RETRIES', 5).toString())
+    }
+
     public getTargetDataSetNamePrefix() {
         throw this.config.get('TARGET_DATASET_NAME_PREFIX', 'raw_mongodb_')
     }

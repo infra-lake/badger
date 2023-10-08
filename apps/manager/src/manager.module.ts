@@ -11,6 +11,8 @@ import { SourceController } from './source.controller'
 import { TargetController } from './target.controller'
 import { WorkloadModule } from '@badger/workload'
 import { ExportController } from './export.controller'
+import { ManagerService } from './manager.service'
+import { ManagerController } from './manager.controller'
 
 @Module({
     imports: [
@@ -22,7 +24,12 @@ import { ExportController } from './export.controller'
         TargetModule,
         WorkloadModule
     ],
-    providers: [ManagerConfigService],
-    controllers: [SourceController, TargetController, ExportController]
+    providers: [ManagerConfigService, ManagerService],
+    controllers: [
+        ManagerController,
+        SourceController,
+        TargetController,
+        ExportController
+    ]
 })
 export class ManagerModule { }

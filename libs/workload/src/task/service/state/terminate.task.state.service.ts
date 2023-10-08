@@ -29,6 +29,8 @@ export class TerminateTaskStateService extends StateService<TaskWithWorkerDTO> {
 
         await this.validate(context, key, undefined, session)
 
+        if (await this.service.existsWithStatus(context, key, [ExportStatus.PAUSED])) { return }
+
         await this.model.findOneAndUpdate(
             {
                 transaction: key.transaction,
@@ -37,7 +39,7 @@ export class TerminateTaskStateService extends StateService<TaskWithWorkerDTO> {
                 worker: key.worker,
                 status: ExportStatus.RUNNING
             },
-            { $set: { status: ExportStatus.TERMINATED } },
+            { $set: { status: ExportStatus.TERMINATED, error: null } },
             { upsert: false, returnDocument: 'after', session }
         )
 
@@ -62,6 +64,8 @@ export class TerminateTaskStateService extends StateService<TaskWithWorkerDTO> {
         try {
 
             await ClassValidatorHelper.validate('key', key)
+
+            if (await this.service.existsWithStatus(context, key, [ExportStatus.PAUSED])) { return }
 
             const found = await this.service.listWithStatus(context, key, [ExportStatus.RUNNING], 'dto')
             if (CollectionHelper.isEmpty(found)) {

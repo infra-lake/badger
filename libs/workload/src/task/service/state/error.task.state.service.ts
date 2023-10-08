@@ -26,11 +26,13 @@ export class ErrorTaskStateService extends StateService<TaskWithWorkerDTO, Error
     @WithTransaction(Task.name)
     public async change(context: TransactionalContext, key: TaskWithWorkerDTO, value: Error, session?: ClientSession): Promise<void> {
 
-        await this.validate(context, key, value)
+        await this.validate(context, key, value, session)
+
+        if (await this.service.existsWithStatus(context, key, [ExportStatus.PAUSED])) { return }
 
         await this.model.findOneAndUpdate(
             {
-                transaction: key._collection,
+                transaction: key.transaction,
                 _export: key._export,
                 _collection: key._collection,
                 worker: key.worker,
@@ -40,11 +42,9 @@ export class ErrorTaskStateService extends StateService<TaskWithWorkerDTO, Error
             { upsert: false, returnDocument: 'after', session }
         )
 
-        if (await this.service.isAllTerminatedOrError(key.error, session)) {
+        if (await this.service.isAllTerminatedOrError(key._export, session)) {
             await this.errorExportService.apply(context, key._export, undefined)
         }
-
-        this.logger.debug?.(ErrorTaskStateService.name, context, 'tasks error successfully registered')
 
     }
 
@@ -62,7 +62,9 @@ export class ErrorTaskStateService extends StateService<TaskWithWorkerDTO, Error
 
             await ClassValidatorHelper.validate('key', key)
 
-            if (ObjectHelper.isEmpty(value)) {
+            if (await this.service.existsWithStatus(context, key, [ExportStatus.PAUSED])) { return }
+
+            if (ObjectHelper.isNullOrUndefined(value)) {
                 throw new InvalidParameterException('value', value)
             }
 

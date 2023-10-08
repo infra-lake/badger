@@ -58,7 +58,7 @@ export class PauseExportStateService extends StateService<Export4FlatKeyDTO> {
             await ClassValidatorHelper.validate('key', key)
 
             const found = await this.service.listWithStatus(context, key, [ExportStatus.CREATED, ExportStatus.RUNNING], 'dto')
-            if (!CollectionHelper.isEmpty(found)) {
+            if (CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'does not possible to pause export because it is not created or running')
             }
 

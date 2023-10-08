@@ -27,7 +27,7 @@ export class RetryExportStateService extends StateService<Export4FlatKeyDTO> {
 
         await this.validate(context, key, session)
 
-        await this.model.findOneAndUpdate(
+        const _export = await this.model.findOneAndUpdate(
             {
                 transaction: key.transaction,
                 'source.name': key.source,
@@ -37,9 +37,9 @@ export class RetryExportStateService extends StateService<Export4FlatKeyDTO> {
             },
             { $set: { status: ExportStatus.CREATED } },
             { upsert: false, returnDocument: 'after', session }
-        )
+        ) as Export
 
-        await this.retryTaskService.apply(context, key, undefined)
+        await this.retryTaskService.apply(context, _export, undefined)
 
     }
 

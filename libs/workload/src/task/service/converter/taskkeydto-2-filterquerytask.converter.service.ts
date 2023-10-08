@@ -5,9 +5,9 @@ import { ConverterService } from '@badger/common/types'
 import { Injectable } from '@nestjs/common'
 import { type FilterQuery } from 'mongoose'
 import { type Task } from '../../task.entity'
-import { type TaskKeyDTO } from '../../task.dto'
+import { type TaskWithWorkerDTO, type TaskKeyDTO } from '../../task.dto'
 
-type Source = TaskKeyDTO
+type Source = TaskKeyDTO | TaskWithWorkerDTO
 type Target = FilterQuery<Required<Pick<Task, 'transaction' | '_export' | '_collection'>>>
 
 @Injectable()
@@ -25,7 +25,7 @@ export class TaskKeyDTO2FilterQueryTaskConverterService extends ConverterService
             _collection: input._collection
         }
 
-        if (!StringHelper.isEmpty(input.worker)) {
+        if ('worker' in input && !StringHelper.isEmpty(input.worker)) {
             output.worker = input.worker
         }
 

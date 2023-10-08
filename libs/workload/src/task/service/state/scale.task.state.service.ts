@@ -62,7 +62,8 @@ export class ScaleTaskStateService extends StateService<Task | undefined, Task4S
             {
                 $set: {
                     worker: value.worker,
-                    window: { begin, end }
+                    window: { begin, end },
+                    error: null
                 }
             },
             { upsert: false, returnDocument: 'after', session }

@@ -1,12 +1,12 @@
 import { InvalidParameterException } from '@badger/common/exception'
 import { CollectionHelper, ObjectHelper, ResilienceHelper } from '@badger/common/helper'
 import { type TransactionalContext } from '@badger/common/transaction'
-import { type WindowDTO } from '@badger/common/window'
-import { Source4DownloadDocumentsDTO, SourceService } from '@badger/source'
-import { Target4UploadDocumentsDTO, TargetService } from '@badger/target'
+import { SourceService } from '@badger/source'
+import { TargetService } from '@badger/target'
 import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { type ClientSession } from 'mongoose'
 import { Task4RunKeyInputDTO, TaskService, type TaskWithWorkerDTO } from '../task'
+import { TaskWithWorkerDTO2Source4DownloadDocumentsDTOConverterService, TaskWithWorkerDTO2Target4UploadDocumentsDTOConverterService } from './converter'
 import { WorkerConfigService } from './worker.config.service'
 import { WorkerStatus, type IWorker } from './worker.contract'
 import { type Worker4SearchDTO } from './worker.dto'
@@ -18,7 +18,9 @@ export class WorkerService {
         private readonly config: WorkerConfigService,
         private readonly sourceService: SourceService,
         private readonly targetService: TargetService,
-        @Inject(forwardRef(() => TaskService)) private readonly taskService: TaskService
+        @Inject(forwardRef(() => TaskService)) private readonly taskService: TaskService,
+        private readonly taskWithWorkerDTO2Target4UploadDocumentsDTOConverter: TaskWithWorkerDTO2Target4UploadDocumentsDTOConverterService,
+        private readonly taskWithWorkerDTO2Source4DownloadDocumentsDTOConverter: TaskWithWorkerDTO2Source4DownloadDocumentsDTOConverterService
     ) { }
 
     public async handle(context: TransactionalContext) {
@@ -35,7 +37,7 @@ export class WorkerService {
                 return
             }
 
-            await ResilienceHelper.tryToRun(context, 5, this.perform.bind(this), task, new Date())
+            await ResilienceHelper.tryToRun(context, this.config.retries, this.perform.bind(this), task, new Date())
 
         } catch (error) {
 
@@ -58,17 +60,7 @@ export class WorkerService {
 
     private async perform(context: TransactionalContext, task: TaskWithWorkerDTO, date: Date) {
 
-        const downloadDTO = new Source4DownloadDocumentsDTO()
-        downloadDTO.name = task._export.source.name
-        downloadDTO.url = task._export.source.url
-        downloadDTO.stamps = task._export.source.stamps
-        downloadDTO.database = task._export.database
-        downloadDTO._collection = task._collection
-        downloadDTO.window = task.window as WindowDTO
-        downloadDTO.tempDir = this.config.getTempDir()
-        downloadDTO.tempFile = this.config.getTempFile()
-        downloadDTO.date = date
-
+        const downloadDTO = await this.taskWithWorkerDTO2Source4DownloadDocumentsDTOConverter.convert(context, { task, date })
         const count = await this.sourceService.downloadDocuments(context, downloadDTO)
 
         if (count <= 0) {
@@ -76,14 +68,7 @@ export class WorkerService {
             return
         }
 
-        const uploadDTO = new Target4UploadDocumentsDTO()
-        uploadDTO.transaction = task.transaction
-        uploadDTO.credentials = task._export.target.credentials
-        uploadDTO.dataset = task._export.database
-        uploadDTO.table = task._collection
-        uploadDTO.tempDir = this.config.getTempDir()
-        uploadDTO.tempFile = this.config.getTempFile()
-
+        const uploadDTO = await this.taskWithWorkerDTO2Target4UploadDocumentsDTOConverter.convert(context, task)
         await this.targetService.uploadDocuments(context, uploadDTO)
 
         await this.taskService.terminate(context, task)

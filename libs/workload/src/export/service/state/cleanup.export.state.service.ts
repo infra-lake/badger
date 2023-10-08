@@ -9,7 +9,6 @@ import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { ClientSession, Model } from 'mongoose'
 import { Export } from '../../export.entity'
-import { ExportService } from '../export.service'
 
 @Injectable()
 export class CleanupExportStateService extends StateService {
@@ -17,7 +16,6 @@ export class CleanupExportStateService extends StateService {
     public constructor(
         logger: TransactionalLoggerService,
         @InjectModel(Export.name) private readonly model: Model<Export>,
-        @Inject(forwardRef(() => ExportService)) private readonly service: ExportService,
         @Inject(forwardRef(() => CleanupTaskStateService)) private readonly cleanupTaskService: CleanupTaskStateService
     ) { super(logger) }
 
@@ -27,8 +25,6 @@ export class CleanupExportStateService extends StateService {
         await this.validate(context, session)
 
         await this.model.deleteMany({}, { session })
-
-        await this.service.cleanup(context)
 
         await this.cleanupTaskService.apply(context, undefined, undefined)
 

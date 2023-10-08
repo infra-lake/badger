@@ -5,7 +5,7 @@ import { Inject, Injectable, forwardRef } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model, type ClientSession, type FilterQuery } from 'mongoose'
 import {
-    Export4ListInputDTO,
+    type Export4ListInputDTO,
     type Export4FlatKeyDTO,
     type Export4FlatKeyWithOptionalTransactionDTO,
     type Export4FlatKeyWithoutTransactionDTO,
@@ -30,7 +30,7 @@ export class ExportService {
         @InjectModel(Export.name) private readonly model: Model<Export>,
         @Inject(forwardRef(() => CreateExportStateService)) private readonly createState: CreateExportStateService,
         @Inject(forwardRef(() => PauseExportStateService)) private readonly pauseState: PauseExportStateService,
-        @Inject(forwardRef(() => UnpauseExportStateService)) private readonly playState: UnpauseExportStateService,
+        @Inject(forwardRef(() => UnpauseExportStateService)) private readonly unpauseState: UnpauseExportStateService,
         @Inject(forwardRef(() => RetryExportStateService)) private readonly retryState: RetryExportStateService,
         @Inject(forwardRef(() => CleanupExportStateService)) private readonly cleanupState: CleanupExportStateService,
         private readonly export2ExportDTOConverter: Export2ExportDTOConverterService,
@@ -46,13 +46,13 @@ export class ExportService {
         return { transaction: TransactionHelper.getTransactionIDFrom(context) }
     }
 
-    public async play(context: TransactionalContext, key: Export4FlatKeyDTO) {
-        await this.playState.apply(context, key, undefined)
+    public async pause(context: TransactionalContext, key: Export4FlatKeyDTO) {
+        await this.pauseState.apply(context, key, undefined)
         return { transaction: TransactionHelper.getTransactionIDFrom(context) }
     }
 
-    public async pause(context: TransactionalContext, key: Export4FlatKeyDTO) {
-        await this.pauseState.apply(context, key, undefined)
+    public async unpause(context: TransactionalContext, key: Export4FlatKeyDTO) {
+        await this.unpauseState.apply(context, key, undefined)
         return { transaction: TransactionHelper.getTransactionIDFrom(context) }
     }
 
@@ -113,9 +113,9 @@ export class ExportService {
     public async list<T extends 'dto' | 'raw'>(context: TransactionalContext, input: Export4ListInputDTO | TaskKeyDTO, returns: T, session?: ClientSession): Promise<T extends 'dto' ? ExportDTO[] : Export[]> {
 
         const filter =
-            input instanceof Export4ListInputDTO
-                ? await this.export4ListInputDTO2FilterQueryConverter.convert(context, input)
-                : await this.taskKeyDTO2FilterQueryConverter.convert(context, input)
+            '_export' in input
+                ? await this.taskKeyDTO2FilterQueryConverter.convert(context, input)
+                : await this.export4ListInputDTO2FilterQueryConverter.convert(context, input)
 
         const options = ObjectHelper.isEmpty(session) ? {} : { session }
 

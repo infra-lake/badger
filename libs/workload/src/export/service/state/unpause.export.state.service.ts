@@ -58,7 +58,7 @@ export class UnpauseExportStateService extends StateService<Export4FlatKeyDTO> {
             await ClassValidatorHelper.validate('key', key)
 
             const found = await this.service.listWithStatus(context, key, [ExportStatus.PAUSED], 'dto')
-            if (!CollectionHelper.isEmpty(found)) {
+            if (CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'could not play the export because it is not paused')
             }
 

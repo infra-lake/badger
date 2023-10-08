@@ -1,5 +1,5 @@
 import { LIVENESS_PROBE_PATH, READINESS_PROBE_PATH } from '@badger/common/health'
-import { NestHelper, SwaggerHelper } from '@badger/common/helper'
+import { ApplicationHelper, NestHelper, SwaggerHelper } from '@badger/common/helper'
 import { DefaultLoggingInterceptor, LoggingHelper } from '@badger/common/logging'
 import { DefaultMetricsInterceptor, METRICS_PATH } from '@badger/common/metrics'
 import { App } from '@badger/common/types'
@@ -23,7 +23,7 @@ async function bootstrap() {
         app.get(DefaultMetricsInterceptor)
     )
 
-    app.setGlobalPrefix('/v3', {
+    app.setGlobalPrefix(ApplicationHelper.BASE_API_PATH, {
         exclude: OBSERVABILITY_PATHS
     })
 

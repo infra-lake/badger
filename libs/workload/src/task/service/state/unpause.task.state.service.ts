@@ -31,7 +31,7 @@ export class UnpauseTaskStateService extends StateService<Export> {
                 _export: key,
                 status: ExportStatus.PAUSED
             },
-            { $set: { status: ExportStatus.CREATED, worker: null, error: null } },
+            { $set: { status: ExportStatus.CREATED, worker: null, error: null, window: null } },
             { upsert: false, session }
         )
 

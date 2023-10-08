@@ -53,7 +53,7 @@ export class ErrorExportStateService extends StateService<Export> {
             await ClassValidatorHelper.validate('key', key)
 
             const found = await this.service.listWithStatus(context, key, [ExportStatus.RUNNING], 'dto')
-            if (!CollectionHelper.isEmpty(found)) {
+            if (CollectionHelper.isEmpty(found)) {
                 throw new InvalidParameterException('export', found, 'does not possible register error on export because export is not running state')
             }
 

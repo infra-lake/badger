@@ -1,0 +1,731 @@
+{
+	"info": {
+		"_postman_id": "c1f488ad-235a-47ae-94a8-d01f841d8901",
+		"name": "badger",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "810932"
+	},
+	"item": [
+		{
+			"name": "source",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"hml\",\n    \"url\": \"mongodb://mongodb:mongodb@mongodb:27017\",\n    \"filter\": {\n        \"ignoredCollections\": [\"system.version\"]\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/source",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"source"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "source",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic bWFpbi1hcHAtdXNlcjpHUmhkR0ZpWVhObExXMXZibWR2WkdJdFlXRTE=",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/source",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"source"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "target",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"hml\",\n    \"credentials\": {\n        \"type\": \"service_account\",\n        \"project_id\": \"poc-project2\",\n        \"private_key_id\": \"4cb76e5547dafde634d5d526f947278dae70da89\",\n        \"private_key\": \"-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCSlsSlxg5I48tu\\nhrRylcM2+UnbuWajZ6dh0v0mxOcXLo3uoSJbhFBSDafJ8BGxK/Y9Df9t7GZP/BlR\\nd/1N62AQdXacQsGySZspt5IlQeWNKHlk5TvYXFkm8t/t6gkXGEmICTyZz6W8twSW\\nBm6sAyhWGGvTWWuGecUkd3xyzPftinz4WT28WLTzZ1Dxg80gBsSTLLewgrdtOVsP\\nml6WIf8dLJ9rT6FuKPud5BNCKvHzcwLdLGMF1GdiixXK3a3ZN8eax1zvjuh+D9Zd\\nTmCHkenP7GFDAIhAoGs3WgmbqCFz2XUihEhDoz2KmzOVI0U8IF03fO15+xKdqqyb\\nwWnTS4a1AgMBAAECggEAB/7U0p0fGFcWBUnjO8C/0uOXMlBGSrFgdG1Kq4h5eYIF\\nJQS0izzufwGjRKULtTGXQhtD8sRX8qyAdDlRBdf895Wm/SNTAOngEbVwJKIXs2Xt\\n9FStUyhhhuAgDXacPYTXArMZea/VJwCG7bWDtQdZdhPpuOLOtf+cT76vEtMezsQp\\nOJFm4GmCbT0G8QoOEjXFoc/Y0tExyweHqcwXJDZo7Erdd1t/LJ1FD7zZ+oWcVnYK\\nDTBcEVo5B6RXmqfAuJXm6VWtm8p97/Lc1yhZnt79iFq5U7if3YEVbAVJugBhPULD\\nvR2y7xTmElRy3MlpnsVErEQCLMJqLiL2bPfm13X9/QKBgQDMPzhzLnBRk94/YspX\\nAmDgHDulvazPAyLIwdKXAtqTb73QTKJo4hp0c8fBZ4CNDLnsbZzGJ/UHlsSaxxc3\\nQYm5mVZJwg9kDwHk9z1rIbpumZQZXEm4/K2ScMu8JEyc/ISXWl1LW4zuQH6tw9up\\n9gkjfz08nXUVgLIMwlh7LEDMrwKBgQC3u3m4pjN30PUnS6YWodWhAMwvZISmso4f\\nDLLfOuESMU7iq2Ql/ZDK9L+Rc5FApNZp5UEspmuvs3Eq8qIkH5svGqbDPAsaUvPC\\nwrlm5NwbghFnR8H/QObDYiuiH+9UrkZ8XQpEIz1uEXRIMjqHZO/N/8JUotgjFnGh\\nVFoQX0ej2wKBgQDHM4ms3Mfy6FLEY2eQwOMW8LJEDd/y7s4IGvF3EvN3BG6OL4/e\\n11aR6TITsQyxhI34x1c19FaIlkUd57r+y06105VSzpAQOIrSc0hVqkmYAPVuXpIQ\\nd3AZ+STbVFPccHQo4ZtIGfwzineCphkhhLKZCkoBSlidJi2BQDLnvttcRQKBgGHa\\nX0GQgujVSTvcdmCnYHeXTSgQiPWfM0ImKT3qxeRCjpj6XyQ8n9j38O8udbXQFMHh\\nb4ywNbol/6e4AdLrYmL79sUUPXWPqHOZ8dRzHycnZs1y0kd38W8t4b8+8uBO0Qt7\\nIfSYMCdm9F9fIPzrLSyxgnZBJIvLcElT+4OsuyLxAoGBALVm2cxeJaXOTuadW+I5\\nptfI3nmHO6lLpIaVQ5TZjlwMCiCFDuReOSUOkJCwIKYS1oXbhsemM/CNdKGZTMwh\\ntVKCdxm8um9MaqnKSI87RBhKE+jPazvTpJyr5gxyEKKqwtMmoYSSIL2DkSJcttXo\\n4jQdKjb1dMkbxIJAo+yR4GMe\\n-----END PRIVATE KEY-----\\n\",\n        \"client_email\": \"airflow@poc-project2.iam.gserviceaccount.com\",\n        \"client_id\": \"106401150262268999681\",\n        \"auth_uri\": \"https://accounts.google.com/o/oauth2/auth\",\n        \"token_uri\": \"https://oauth2.googleapis.com/token\",\n        \"auth_provider_x509_cert_url\": \"https://www.googleapis.com/oauth2/v1/certs\",\n        \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/airflow%40poc-project2.iam.gserviceaccount.com\",\n        \"universe_domain\": \"googleapis.com\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/target",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"target"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "target",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic bWFpbi1hcHAtdXNlcjpHUmhkR0ZpWVhObExXMXZibWR2WkdJdFlXRTE=",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/target",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"target"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "explore",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic bWFpbi1hcHAtdXNlcjpHUmhkR0ZpWVhObExXMXZibWR2WkdJdFlXRTE=",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://mongodb-exporter.learntofly.global/explore/main/",
+					"protocol": "https",
+					"host": [
+						"mongodb-exporter",
+						"learntofly",
+						"global"
+					],
+					"path": [
+						"explore",
+						"main",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.create",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"source\": \"hml\",\n    \"target\": \"hml\",\n    \"database\": \"settings\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/export/create",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"create"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.cleanup",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/export/cleanup",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"cleanup"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.retry",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"transaction\": \"be34b892-5735-4e10-9ded-69da25c817f7\",\n    \"source\": \"hml\",\n    \"target\": \"hml\",\n    \"database\": \"settings\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/export/retry",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"retry"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.pause",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"transaction\": \"a3921dd3-f57c-497c-a156-ebb5b16614ee\",\n    \"source\": \"hml\",\n    \"target\": \"hml\",\n    \"database\": \"settings\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/export/pause",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"pause"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.unpause",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"transaction\": \"a3921dd3-f57c-497c-a156-ebb5b16614ee\",\n    \"source\": \"hml\",\n    \"target\": \"hml\",\n    \"database\": \"settings\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/export/unpause",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"unpause"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.check",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/export/check?transaction=a3921dd3-f57c-497c-a156-ebb5b16614ee&source=hml&target=hml&database=settings",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"check"
+					],
+					"query": [
+						{
+							"key": "transaction",
+							"value": "a3921dd3-f57c-497c-a156-ebb5b16614ee"
+						},
+						{
+							"key": "source",
+							"value": "hml"
+						},
+						{
+							"key": "target",
+							"value": "hml"
+						},
+						{
+							"key": "database",
+							"value": "settings"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic bWFpbi1hcHAtdXNlcjpHUmhkR0ZpWVhObExXMXZibWR2WkdJdFlXRTE=",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/export?transaction=a3921dd3-f57c-497c-a156-ebb5b16614ee&source=hml&target=hml&database=settings&status=running",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export"
+					],
+					"query": [
+						{
+							"key": "transaction",
+							"value": "a3921dd3-f57c-497c-a156-ebb5b16614ee"
+						},
+						{
+							"key": "source",
+							"value": "hml"
+						},
+						{
+							"key": "target",
+							"value": "hml"
+						},
+						{
+							"key": "database",
+							"value": "settings"
+						},
+						{
+							"key": "status",
+							"value": "running"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.task",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/export/task?transaction=a3921dd3-f57c-497c-a156-ebb5b16614ee&source=hml&target=hml&database=settings&status=running&_collection=exports&worker=worker1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"task"
+					],
+					"query": [
+						{
+							"key": "transaction",
+							"value": "a3921dd3-f57c-497c-a156-ebb5b16614ee"
+						},
+						{
+							"key": "source",
+							"value": "hml"
+						},
+						{
+							"key": "target",
+							"value": "hml"
+						},
+						{
+							"key": "database",
+							"value": "settings"
+						},
+						{
+							"key": "status",
+							"value": "running"
+						},
+						{
+							"key": "_collection",
+							"value": "exports"
+						},
+						{
+							"key": "worker",
+							"value": "worker1"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.task[created]",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/export/task?status=created",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"task"
+					],
+					"query": [
+						{
+							"key": "status",
+							"value": "created"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.task[running]",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic bWFpbi1hcHAtdXNlcjpHUmhkR0ZpWVhObExXMXZibWR2WkdJdFlXRTE=",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/export/task?status=running",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"task"
+					],
+					"query": [
+						{
+							"key": "status",
+							"value": "running"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.task[error]",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic bWFpbi1hcHAtdXNlcjpHUmhkR0ZpWVhObExXMXZibWR2WkdJdFlXRTE=",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/export/task?status=error",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"task"
+					],
+					"query": [
+						{
+							"key": "status",
+							"value": "error"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.task[terminated]",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic bWFpbi1hcHAtdXNlcjpHUmhkR0ZpWVhObExXMXZibWR2WkdJdFlXRTE=",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/export/task?status=terminated",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"task"
+					],
+					"query": [
+						{
+							"key": "status",
+							"value": "terminated"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "export.task[paused]",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic bWFpbi1hcHAtdXNlcjpHUmhkR0ZpWVhObExXMXZibWR2WkdJdFlXRTE=",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/v3/export/task?status=paused",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"export",
+						"task"
+					],
+					"query": [
+						{
+							"key": "status",
+							"value": "paused"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "voter",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/worker",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"worker"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "worker",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic aG1sLXVzZXI6aG1sQDMyMQ==",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/v3/worker",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"v3",
+						"worker"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -7,7 +7,7 @@ import { BadRequestException, Inject, Injectable, forwardRef } from '@nestjs/com
 import { InjectModel } from '@nestjs/mongoose'
 import { BSONType } from 'mongodb'
 import { Model, type ClientSession, type FilterQuery } from 'mongoose'
-import { Export, ExportService, ExportStatus, type Export4FlatKeyDTO } from '../../export'
+import { type Export, ExportService, ExportStatus, type Export4FlatKeyDTO } from '../../export'
 import { type IWorker } from '../../worker'
 import {
     type TaskKeyDTO,
@@ -174,7 +174,7 @@ export class TaskService {
 
     }
 
-    public async existsWithStatus(context: TransactionalContext, input: TaskKeyDTO, statuses: ExportStatus[], session?: ClientSession) {
+    public async existsWithStatus(context: TransactionalContext, input: TaskKeyDTO | TaskWithWorkerDTO, statuses: ExportStatus[], session?: ClientSession) {
 
         await ClassValidatorHelper.validate('input', input)
 
@@ -198,18 +198,24 @@ export class TaskService {
 
         await ClassValidatorHelper.validate('input', input)
 
-        const filter =
-            input instanceof Export
-                ? {}
-                : await this.task4FlatKeyDTO2FilterQueryConverter.convert(context, input)
+        let filter: FilterQuery<Partial<Task>>
 
-        const _exports = await this.exportService.listWithStatus(context, input, statuses, 'raw', session)
+        if (typeof input.source === 'string') {
+            filter = await this.task4FlatKeyDTO2FilterQueryConverter.convert(context, input as Task4FlatKeyDTO | Task4FlatKeyWithOptionalTransactionDTO | Export4FlatKeyDTO)
+            const _exports = await this.exportService.listWithStatus(context, input, statuses, 'raw', session)
+            filter.$or = [
+                // eslint-disable-next-line array-element-newline
+                ...statuses.map(status => ({ status })),
+                ..._exports.map(_export => ({ _export }))
+            ]
+        } else {
+            filter = {
+                transaction: input.transaction,
+                _export: (input as Export)._id,
+                $or: statuses.map(status => ({ status }))
 
-        filter.$or = [
-            // eslint-disable-next-line array-element-newline
-            ...statuses.map(status => ({ status })),
-            ..._exports.map(_export => ({ _export }))
-        ]
+            }
+        }
 
         const options = ObjectHelper.isEmpty(session) ? {} : { session }
 
