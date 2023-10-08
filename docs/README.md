@@ -1,8 +1,8 @@
-# Badger
+# Badger 
 
 Badger is a tool that export MongoDB data to Google BigQuery. 
 
-![logo](./logo/backgroundless.png)
+<a href="https://infra-lake.github.io/badger/" target="blank"><img src="./logo/backgroundless.png" width="300" alt="Nest Logo" /></a>
 
 ## Architecture
 
