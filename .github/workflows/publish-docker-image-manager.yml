@@ -7,7 +7,7 @@
 # Para obter uma versão mais recente, você precisará atualizar o SHA.
 # Você também pode fazer referência a uma marca ou branch, mas a ação pode ser alterada sem aviso.
 
-name: Manager - Publish Docker image
+name: Publish Docker Image Manager
 
 on:
   release:
