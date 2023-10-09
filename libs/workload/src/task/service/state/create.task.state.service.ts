@@ -36,8 +36,6 @@ export class CreateTaskStateService extends StateService<Export, string | undefi
 
         await Promise.all(collections.map(async _collection => {
 
-            if (_collection !== 'trash') { return }
-
             await this.validate(context, key, _collection, session)
 
             this.logger.log(CreateTaskStateService.name, context, 'creating task', { _collection })
