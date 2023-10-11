@@ -5,6 +5,7 @@ import { LoggingHelper, TransactionalLoggerService } from '../logging'
 import { TransactionHelper, type TransactionalContext } from '../transaction'
 import { NestHelper } from './nest.helper'
 import { ObjectHelper } from './object.helper'
+import { AuthConfigService, AuthStrategyType } from '../auth'
 
 export type HttpRequestInput = AxiosRequestConfig & { method?: Method, throwErrorOnNotSuccess?: boolean }
 
@@ -66,6 +67,24 @@ export class HTTPClientHelper {
     public static isError(response: { status: number }) {
         const result = !HTTPClientHelper.isSuccess(response)
         return result
+    }
+
+    public static withBasicAuthorizationHeaders() {
+
+        if (AuthConfigService.STRATEGY === AuthStrategyType.NO) {
+            return {}
+        }
+
+        const service = NestHelper.get(AuthConfigService)
+
+        const { username, password } = service.basic
+
+        const digest = Buffer.from(`${username}:${password}`).toString('base64')
+
+        return {
+            Authorization: `Basic ${digest}`
+        }
+
     }
 
 }

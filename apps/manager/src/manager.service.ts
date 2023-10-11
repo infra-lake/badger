@@ -35,7 +35,8 @@ export class ManagerService {
         const { data: output } = await HTTPClientHelper.request<WorkerDTO[]>(context, this.http, {
             method: 'GET',
             url,
-            params: input
+            params: input,
+            headers: HTTPClientHelper.withBasicAuthorizationHeaders()
         })
 
         return output
