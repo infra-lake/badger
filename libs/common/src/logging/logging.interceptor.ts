@@ -5,6 +5,7 @@ import { type Observable } from 'rxjs'
 import { LIVENESS_PROBE_PATH, READINESS_PROBE_PATH } from '../health'
 import { ExecutionContextHelper } from '@badger/common/helper'
 import { type TransactionalLoggerService } from './transactional-logger.service'
+import { METRICS_PATH } from '../metrics'
 
 export interface MetadataDTO {
     controller: string
@@ -21,7 +22,7 @@ export abstract class LoggingInterceptor<T = any, R = any> implements NestInterc
 
     protected isUnloggable(http: HttpArgumentsHost) {
         const request = http.getRequest<Request>()
-        return ['/_/metrics', LIVENESS_PROBE_PATH, READINESS_PROBE_PATH].includes(request.url)
+        return [METRICS_PATH, LIVENESS_PROBE_PATH, READINESS_PROBE_PATH].includes(request.url)
     }
 
     protected isHTTPRequestForWriting(http: HttpArgumentsHost) {
