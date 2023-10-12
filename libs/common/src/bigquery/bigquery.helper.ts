@@ -90,7 +90,7 @@ export class BigQueryHelper {
 
         const dataset = await BigQueryHelper.getOrCreateDataSet(context, client, datasetName)
 
-        logger.debug?.(BigQueryHelper.name, context, 'checking if table exists on bigquery', { dataset, table })
+        logger.debug?.(BigQueryHelper.name, context, 'checking if table exists on bigquery', { dataset: datasetName, table })
         const result = dataset.table(table.name)
 
         let exists = false
@@ -126,7 +126,7 @@ export class BigQueryHelper {
         const dataset = await BigQueryHelper.getOrCreateDataSet(context, client, datasetName)
 
         logger.debug?.(BigQueryHelper.name, context, 'checking if table exists on bigquery', { dataset: datasetName, table })
-        const result = (dataset).table(table.name)
+        const result = dataset.table(table.name)
 
         let exists = false
 
