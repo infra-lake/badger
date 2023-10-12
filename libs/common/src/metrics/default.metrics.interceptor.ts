@@ -1,4 +1,4 @@
-import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor } from '@nestjs/common'
+import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor, Inject, forwardRef } from '@nestjs/common'
 import { type HttpArgumentsHost } from '@nestjs/common/interfaces'
 import { InjectMetric } from '@willsoto/nestjs-prometheus'
 import { type Request } from 'express'
@@ -18,7 +18,7 @@ export class DefaultMetricsInterceptor implements NestInterceptor {
 
     public constructor(
         @InjectMetric(Metrics.HTTP_RECEIVED_REQUESTS_TOTAL) public httpReceivedRequestsTotal: Counter<string>,
-        private readonly logger: TransactionalLoggerService
+        @Inject(forwardRef(() => TransactionalLoggerService)) private readonly logger: TransactionalLoggerService
     ) { }
 
     public intercept(executionContext: ExecutionContext, next: CallHandler) {
