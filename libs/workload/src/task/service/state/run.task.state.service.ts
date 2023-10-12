@@ -51,6 +51,10 @@ export class RunTaskStateService extends StateService<Task4RunKeyInputDTO, undef
 
     private async getNextTask(context: TransactionalContext, key: Task4RunKeyInputDTO, session?: ClientSession) {
 
+        this.logger.debug?.(RunTaskStateService.name, context, 'trying get next task for', {
+            worker: key.worker
+        })
+
         const result = await this.model.findOne(
             {
                 worker: key.worker,

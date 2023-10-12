@@ -5,6 +5,8 @@ import { tap } from 'rxjs/operators'
 import { LoggingHelper } from './logging.helper'
 import { TransactionalLoggerService } from './transactional-logger.service'
 import { LoggingInterceptor, type MetadataDTO } from './logging.interceptor'
+import { METRICS_PATH } from '../metrics'
+import { LIVENESS_PROBE_PATH, READINESS_PROBE_PATH } from '../health'
 
 type LogHTTPRequestStep = 'before-execution' | 'after-execution'
 
@@ -96,6 +98,11 @@ export class DefaultLoggingInterceptor extends LoggingInterceptor {
         const { url, method } = request
 
         if (LoggingHelper.getLoggerLevel() !== 'debug') {
+            return { request: { url, method } }
+        }
+
+        if ([LIVENESS_PROBE_PATH, READINESS_PROBE_PATH, METRICS_PATH].includes(url) &&
+            LoggingHelper.getLoggerLevel() !== 'silly') {
             return { request: { url, method } }
         }
 

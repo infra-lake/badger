@@ -46,7 +46,6 @@ import {
     UnpauseTaskStateService
 } from './task/service/state'
 import { WorkerConfigService, WorkerService } from './worker'
-import { WorkloadService } from './workload.service'
 import {
     TaskWithWorkerDTO2Source4DownloadDocumentsDTOConverterService,
     TaskWithWorkerDTO2Target4UploadDocumentsDTOConverterService
@@ -96,14 +95,8 @@ import {
         TaskWithWorkerDTO2Target4UploadDocumentsDTOConverterService,
         TaskWithWorkerDTO2Source4DownloadDocumentsDTOConverterService,
         WorkerConfigService,
-        WorkloadService,
         WorkerService
     ],
-    exports: [
-        ExportService,
-        TaskService,
-        WorkloadService,
-        WorkerService
-    ]
+    exports: [ExportService, TaskService, WorkerService]
 })
 export class WorkloadModule { }
