@@ -141,7 +141,7 @@ export class SourceService {
 
                 FileSystemHelper.appendRowOnFile(context, fileDescriptor, row)
 
-                this.logStatistics(context, fileDescriptor, count, ++appends)
+                this.logStatistics(context, dto, fileDescriptor, count, ++appends)
 
             }
 
@@ -247,15 +247,17 @@ export class SourceService {
 
     }
 
-    private logStatistics(context: TransactionalContext, fileDescriptor: number, count: number, appends: number) {
+    private logStatistics(context: TransactionalContext, dto: Source4DownloadDocumentsDTO, fileDescriptor: number, count: number, appends: number) {
         const statistics = {
-            count: appends,
+            database: dto.database,
+            collection: dto._collection,
+            count: appends.toLocaleString('pt-BR'),
             total: count.toLocaleString('pt-BR'),
             percent: ((appends / count) * 100).toFixed(2),
             size: FileSystemHelper.getFileSizeFrom(fileDescriptor)
         }
 
-        this.logger.log(SourceService.name, context, `append statistics: ${statistics.count} of ${statistics.total} rows, ${statistics.percent} %, ${statistics.size})`)
+        this.logger.log(SourceService.name, context, 'statistics', statistics)
     }
 
 }
