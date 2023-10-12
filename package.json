@@ -1,6 +1,6 @@
 {
     "name": "badger",
-    "version": "3.0.5",
+    "version": "3.0.6",
     "description": "Badger is a tool that export MongoDB data to Google BigQuery",
     "author": "Herberton Candido Souza",
     "license": "UNLICENSED",
